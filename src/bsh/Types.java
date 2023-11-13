@@ -34,7 +34,7 @@ package bsh;
 
 
 */
-class Types 
+public class Types 
 {
 	/*
 		Type conversion identifiers.  An ASSIGNMENT allows conversions that would

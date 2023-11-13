@@ -55,7 +55,7 @@ class BSHAssignment extends SimpleNode implements ParserConstants
 		Object lhsValue = null;
 		if ( operator != ASSIGN ) // assign doesn't need the pre-value
 			try {
-				lhsValue = lhs.getValue();
+				lhsValue = lhs.getValue(interpreter);
 			} catch ( UtilEvalError e ) {
 				throw e.toEvalError( this, callstack );
 			}

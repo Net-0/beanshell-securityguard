@@ -688,7 +688,7 @@ public class NameSpace
 	public Object getVariableOrProperty( String name, Interpreter interp ) 
 		throws UtilEvalError
 	{
-		Object val = getVariable( name, true );
+		Object val = getVariable( name, interp, true );
 		return (val==Primitive.VOID) ? getPropertyValue(name, interp) : val;
 	}		
 
@@ -702,10 +702,10 @@ public class NameSpace
 
 		@return The variable value or Primitive.VOID if it is not defined.
 	*/
-    public Object getVariable( String name ) 
+    public Object getVariable( String name, Interpreter interpreter ) 
 		throws UtilEvalError
 	{
-		return getVariable( name, true );
+		return getVariable( name, interpreter, true );
 	}
 
 	/**
@@ -720,11 +720,11 @@ public class NameSpace
 
 		@return The variable value or Primitive.VOID if it is not defined.
 	*/
-    public Object getVariable( String name, boolean recurse ) 
+    public Object getVariable( String name, Interpreter interpreter, boolean recurse ) 
 		throws UtilEvalError
 	{
 		Variable var = getVariableImpl( name, recurse );
-		return unwrapVariable( var );
+		return unwrapVariable( interpreter, var );
     }
 
 	/**
@@ -778,10 +778,10 @@ public class NameSpace
 		@return return the variable value.  A null var is mapped to 
 			Primitive.VOID
 	*/
-	protected Object unwrapVariable( Variable var ) 
+	protected Object unwrapVariable( Interpreter interpreter, Variable var ) 
 		throws UtilEvalError
 	{
-		return (var == null) ? Primitive.VOID :	var.getValue();
+		return (var == null) ? Primitive.VOID :	var.getValue(interpreter);
 	}
 
 	/**

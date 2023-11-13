@@ -47,7 +47,7 @@ class BSHUnaryExpression extends SimpleNode implements ParserConstants
 			if ( kind == INCR || kind == DECR ) {
 				LHS lhs = ((BSHPrimaryExpression)node).toLHS( 
 					callstack, interpreter );
-				return lhsUnaryOperation( lhs, interpreter.getStrictJava() );
+				return lhsUnaryOperation( lhs, interpreter );
 			} else
 				return 
 					unaryOperation( node.eval(callstack, interpreter), kind );
@@ -56,12 +56,12 @@ class BSHUnaryExpression extends SimpleNode implements ParserConstants
 		}
     }
 
-    private Object lhsUnaryOperation( LHS lhs, boolean strictJava ) 
+    private Object lhsUnaryOperation( LHS lhs, Interpreter interpreter ) 
 		throws UtilEvalError
     {
         if ( Interpreter.DEBUG ) Interpreter.debug("lhsUnaryOperation");
         Object prevalue, postvalue;
-        prevalue = lhs.getValue();
+        prevalue = lhs.getValue(interpreter);
         postvalue = unaryOperation(prevalue, kind);
 
 		Object retVal;
@@ -70,7 +70,7 @@ class BSHUnaryExpression extends SimpleNode implements ParserConstants
 		else
 			retVal = postvalue;
 
-		lhs.assign( postvalue, strictJava );
+		lhs.assign( postvalue, interpreter.getStrictJava() );
 		return retVal;
     }
 

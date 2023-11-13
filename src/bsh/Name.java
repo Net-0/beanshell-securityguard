@@ -391,6 +391,10 @@ class Name implements java.io.Serializable
 			}
 
 			Object obj = null;
+
+			// Validate if can get this static field
+			interpreter.mainSecurityGuard.canGetStaticField(clas, field);
+
 			// static field?
 			try {
 				if ( Interpreter.DEBUG ) 
@@ -431,6 +435,9 @@ class Name implements java.io.Serializable
 		*/
 
 		String field = prefix(evalName, 1);
+
+		// Validate if can get this field
+		interpreter.mainSecurityGuard.canGetField(evalBaseObject, field);
 
 		// length access on array? 
 		if ( field.equals("length") && evalBaseObject.getClass().isArray() )
@@ -586,7 +593,7 @@ class Name implements java.io.Serializable
 
 
 		if ( obj == null )
-			obj = thisNameSpace.getVariable(varName, evalBaseObject == null);
+			obj = thisNameSpace.getVariable(varName, interpreter, evalBaseObject == null);
 
 		if ( obj == null )
 			throw new InterpreterError("null this field ref:"+varName);
@@ -790,6 +797,9 @@ class Name implements java.io.Serializable
 		// Note: maybe factor this out with path below... clean up.
         if ( classOfStaticMethod != null )
 		{
+			// Validate if can invoke this static method
+			interpreter.mainSecurityGuard.canInvokeStaticMethod(classOfStaticMethod, methodName, args);
+
 			return Reflect.invokeStaticMethod( 
 				bcm, classOfStaticMethod, methodName, args );
 		}
@@ -816,6 +826,9 @@ class Name implements java.io.Serializable
 			if ( classNameSpace != null )
 			{
 				Object instance = classNameSpace.getClassInstance();
+				// Validate if can invoke this super method
+				interpreter.mainSecurityGuard.canInvokeSuperMethod(instance.getClass().getSuperclass(), instance, methodName, args);
+
 				return ClassGenerator.getClassGenerator()
 					.invokeSuperclassMethod( bcm, instance, methodName, args );
 			}
@@ -848,6 +861,9 @@ class Name implements java.io.Serializable
 					+ " allowing bsh.Primitive to peek through for debugging");
             }
 
+			// Validate if can invoke this static method
+			interpreter.mainSecurityGuard.canInvokeMethod(obj, methodName, args);
+
             // found an object and it's not an undefined variable
             return Reflect.invokeObjectMethod(
 				obj, methodName, args, interpreter, callstack, callerInfo );
@@ -863,12 +879,15 @@ class Name implements java.io.Serializable
 
 		// cache the fact that this is a static method invocation on this class
 		classOfStaticMethod = clas;
-		
-        if ( clas != null )
-			return Reflect.invokeStaticMethod( bcm, clas, methodName, args );
 
-        // return null; ???
-		throw new UtilEvalError("invokeMethod: unknown target: " + targetName);
+		// return null; ???
+        if ( clas == null )
+			throw new UtilEvalError("invokeMethod: unknown target: " + targetName);
+
+		// Validate if can invoke this static method
+		interpreter.mainSecurityGuard.canInvokeStaticMethod(clas, methodName, args);
+
+		return Reflect.invokeStaticMethod( bcm, clas, methodName, args );
     }
 
 	/**

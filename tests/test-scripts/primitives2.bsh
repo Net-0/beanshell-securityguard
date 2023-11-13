@@ -4,8 +4,8 @@ source("TestHarness.bsh");
 
 check(a, val, java.lang.Class cl) { 
 	// we're looking at the Primitive here
-	assert( a.getValue().getClass().equals( cl ) );
-	assert( a.getValue() == val );
+	assert( a.getValue(this.interpreter).getClass().equals( cl ) );
+	assert( a.getValue(this.interpreter) == val );
 }
 
 // Promotion tests

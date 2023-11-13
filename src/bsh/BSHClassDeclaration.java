@@ -62,6 +62,13 @@ class BSHClassDeclaration extends SimpleNode
 		{
 			BSHAmbiguousName superNode = (BSHAmbiguousName)jjtGetChild(child++);
 			superClass = superNode.toClass( callstack, interpreter );
+
+			// Validate if can extend this class
+			try {
+				interpreter.mainSecurityGuard.canExtends(superClass);
+			} catch (UtilEvalError e) {
+				throw e.toEvalError(this, callstack);
+			}			
 		}
 
 		// Get interfaces
@@ -73,6 +80,13 @@ class BSHClassDeclaration extends SimpleNode
 				throw new EvalError(
 					"Type: "+node.text+" is not an interface!", 
 					this, callstack );
+
+			// Validate if can implement this interface
+			try {
+				interpreter.mainSecurityGuard.canImplements(interfaces[i]);
+			} catch (UtilEvalError e) {
+				throw e.toEvalError(this, callstack);
+			}
 		}
 
 		BSHBlock block;

@@ -28,6 +28,7 @@
 package bsh;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.InvocationTargetException;
 
 /**
@@ -212,7 +213,14 @@ public class BshMethod
 					throw new Error("HERE!");
 
 		if ( javaMethod != null )
+		{
 			try {
+				// Validate if can invoke this method
+				if (Modifier.isStatic(javaMethod.getModifiers()))
+					interpreter.mainSecurityGuard.canInvokeStaticMethod(javaMethod.getDeclaringClass(), javaMethod.getName(), argValues);
+				else
+					interpreter.mainSecurityGuard.canInvokeMethod(javaObject, javaMethod.getName(), argValues);
+
 				return Reflect.invokeMethod(
 					javaMethod, javaObject, argValues ); 
 			} catch ( ReflectError e ) {
@@ -222,7 +230,10 @@ public class BshMethod
 				throw new TargetError( 
 					"Exception invoking imported object method.", 
 					e2, callerInfo, callstack, true/*isNative*/ );
+			} catch (UtilEvalError e3) {
+				throw e3.toEvalError(callerInfo, callstack);
 			}
+		}
 
 		// is this a syncrhonized method?
 		if ( modifiers != null && modifiers.hasModifier("synchronized") )

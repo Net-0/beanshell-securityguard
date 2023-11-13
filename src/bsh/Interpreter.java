@@ -43,6 +43,9 @@ import java.io.Serializable;
 import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import bsh.security.MainSecurityGuard;
+import bsh.security.SecurityGuard;
+import java.util.Arrays;
 
 /**
 	The BeanShell script interpreter.
@@ -115,6 +118,8 @@ public class Interpreter
 	// This should be per instance
     transient static PrintStream debug;
 	static String systemLineSeparator = "\n"; // default
+	/** It's the main security guard used by the Interpreter to prevent the execution of dangerous code */
+	public final MainSecurityGuard mainSecurityGuard;
 
 	static { 
 		staticInit();
@@ -189,6 +194,7 @@ public class Interpreter
 		if ( parent != null )
 			setStrictJava( parent.getStrictJava() );
 		this.sourceFileInfo = sourceFileInfo;
+		this.mainSecurityGuard = parent != null ? new MainSecurityGuard(parent.mainSecurityGuard) : new MainSecurityGuard();
 
 		BshClassManager bcm = BshClassManager.createClassManager( this );
 		if ( namespace == null )

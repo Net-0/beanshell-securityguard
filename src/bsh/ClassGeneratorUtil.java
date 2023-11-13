@@ -889,10 +889,11 @@ public class ClassGeneratorUtil implements Constants
 		if ( classStaticThis == null )
 			throw new InterpreterError( "Unititialized class: no static" );
 
+		Interpreter interpreter = classStaticThis.declaringInterpreter;
 		DelayedEvalBshMethod [] constructors;
 		try {
 			Object cons =
-				classStaticThis.getNameSpace().getVariable( BSHCONSTRUCTORS );
+				classStaticThis.getNameSpace().getVariable( BSHCONSTRUCTORS, interpreter );
 			if ( cons == Primitive.VOID )
 				throw new InterpreterError(
 					"Unable to find constructors array in class" );
@@ -955,7 +956,6 @@ public class ClassGeneratorUtil implements Constants
 		CallStack callstack = new CallStack();
 		callstack.push( consArgsNameSpace);
 		Object [] args = null;
-		Interpreter interpreter = classStaticThis.declaringInterpreter;
 
 		try {
 			args = argsNode.getArguments( callstack, interpreter );
@@ -1043,7 +1043,7 @@ public class ClassGeneratorUtil implements Constants
 			BSHBlock instanceInitBlock;
 			try {
 				instanceInitBlock = (BSHBlock)classStaticThis.getNameSpace()
-					.getVariable( BSHINIT );
+					.getVariable( BSHINIT, interpreter );
 			} catch ( Exception e ) {
 				throw new InterpreterError(
 					"unable to get instance initializer: "+e );

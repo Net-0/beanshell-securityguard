@@ -37,13 +37,14 @@ public class Namespace_chaining {
     public void namespace_nesting() throws UtilEvalError {
         final NameSpace root = new NameSpace((NameSpace) null, "root");
         final NameSpace child = new NameSpace(root, "child");
+        final Interpreter interpreter = new Interpreter();
 
         root.setLocalVariable("bar", 42, false);
-        assertEquals(42, child.getVariable("bar"));
+        assertEquals(42, child.getVariable("bar", interpreter));
 
         child.setLocalVariable("bar", 4711, false);
-        assertEquals(4711, child.getVariable("bar"));
-        assertEquals(42, root.getVariable("bar"));
+        assertEquals(4711, child.getVariable("bar", interpreter));
+        assertEquals(42, root.getVariable("bar", interpreter));
     }
 
 

@@ -101,7 +101,7 @@ class BSHPrimaryExpression extends SimpleNode
 				return obj;
 			else
 				try {
-					return ((LHS)obj).getValue();
+					return ((LHS)obj).getValue(interpreter);
 				} catch ( UtilEvalError e ) {
 					throw e.toEvalError( this, callstack );
 				}

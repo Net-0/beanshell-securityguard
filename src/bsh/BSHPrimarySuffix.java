@@ -98,7 +98,7 @@ class BSHPrimarySuffix extends SimpleNode
 		else
 			if ( obj instanceof LHS )
 				try {
-					obj = ((LHS)obj).getValue();
+					obj = ((LHS)obj).getValue(interpreter);
 				} catch ( UtilEvalError e ) {
 					throw e.toEvalError( this, callstack );
 				}
@@ -142,24 +142,35 @@ class BSHPrimarySuffix extends SimpleNode
 	{
 		try {
 			// .length on array
-			if ( field.equals("length") && obj.getClass().isArray() )
+			if ( field.equals("length") && obj.getClass().isArray() ) {
+				// Validate if can get this field
+				interpreter.mainSecurityGuard.canGetField(obj, field);
+
 				if ( toLHS )
 					throw new EvalError(
 						"Can't assign array length", this, callstack );
 				else
 					return new Primitive(Array.getLength(obj));
+			}
 			
 			// field access
-			if ( jjtGetNumChildren() == 0 ) 
+			if ( jjtGetNumChildren() == 0 ) {
+				// Validate if can get this field
+				interpreter.mainSecurityGuard.canGetField(obj, field);
+
 				if ( toLHS )
 					return Reflect.getLHSObjectField(obj, field);
 				else
 					return Reflect.getObjectFieldValue( obj, field );
+			}
 
 			// Method invocation
 			// (LHS or non LHS evaluation can both encounter method calls)
 			Object[] oa = ((BSHArguments)jjtGetChild(0)).getArguments(
 				callstack, interpreter);
+
+			// Validate if can invoke this method
+			interpreter.mainSecurityGuard.canInvokeMethod(obj, field, oa);
 
 		// TODO:
 		// Note: this try/catch block is copied from BSHMethodInvocation

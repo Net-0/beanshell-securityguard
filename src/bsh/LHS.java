@@ -30,6 +30,7 @@ package bsh;
 
 import java.lang.reflect.Field;
 import java.util.Hashtable;
+import java.lang.reflect.Modifier;
 
 /**
 	An LHS is a wrapper for an variable, field, or property.  It ordinarily 
@@ -132,7 +133,7 @@ class LHS implements ParserConstants, java.io.Serializable
 		this.index = index;
 	}
 
-	public Object getValue() throws UtilEvalError
+	public Object getValue(Interpreter interpreter) throws UtilEvalError
 	{
 		if ( type == VARIABLE )
 			return nameSpace.getVariableOrProperty( varName, null );
@@ -140,6 +141,12 @@ class LHS implements ParserConstants, java.io.Serializable
 
 		if (type == FIELD)
 			try {
+				// Validate if can get this field
+				if (Modifier.isStatic(field.getModifiers()))
+					interpreter.mainSecurityGuard.canGetStaticField(field.getDeclaringClass(), field.getName());
+				else
+					interpreter.mainSecurityGuard.canGetField(object, field.getName());
+
 				Object o = field.get( object );
 				return Primitive.wrap( o, field.getType() );
 			} catch(IllegalAccessException e2) {
