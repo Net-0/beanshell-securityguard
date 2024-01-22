@@ -93,7 +93,7 @@ class BSHAllocationExpression extends SimpleNode
         if ( obj instanceof ClassIdentifier )
             type = ((ClassIdentifier)obj).getTargetClass();
         else
-            throw new EvalError(
+            throw new EvalException(
                 "Unknown class: "+nameNode.text, this, callstack );
 
         // Is an inner class style object allocation
@@ -156,7 +156,7 @@ class BSHAllocationExpression extends SimpleNode
         try {
             obj = Reflect.constructObject( type, args );
         } catch ( ReflectError e) {
-            throw new EvalError(
+            throw new EvalException(
                 "Constructor error: " + e.getMessage(), this, callstack, e);
         } catch (InvocationTargetException | CompletionException e) {
             // No need to wrap this debug
@@ -208,7 +208,7 @@ class BSHAllocationExpression extends SimpleNode
             Throwable cause = e;
             if ( e instanceof InvocationTargetException )
                 cause = e.getCause();
-            throw new EvalError("Error constructing inner class instance: "
+            throw new EvalException("Error constructing inner class instance: "
                 + e, this, callstack, cause);
         }
     }
@@ -316,7 +316,7 @@ class BSHAllocationExpression extends SimpleNode
         } catch( NegativeArraySizeException e1 ) {
             throw new TargetError( e1, this, callstack );
         } catch( Exception e ) {
-            throw new EvalError("Can't construct primitive array: "
+            throw new EvalException("Can't construct primitive array: "
                     + e.getMessage(), this, callstack, e);
         }
     }
