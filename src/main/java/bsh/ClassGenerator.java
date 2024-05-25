@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class ClassGenerator {
 
@@ -89,6 +91,24 @@ public final class ClassGenerator {
         // Generate the type for our class
         Variable[] variables = getDeclaredVariables(block, callstack, interpreter, packageName);
         DelayedEvalBshMethod[] methods = getDeclaredMethods(block, callstack, interpreter, packageName, superClass);
+
+        // Collect final methods from all super class namespaces
+        List<BshMethod> superFinalMethods = Stream.of(Reflect.getDeclaredMethods(superClass))
+                                                    .filter(m -> m.hasModifier("final") && !m.hasModifier("private"))
+                                                    .collect(Collectors.toList());
+        // Validate final methods
+        for (DelayedEvalBshMethod method: methods) {
+            if (method.getName().equals(className)) continue; // It's a constructor
+
+            for (BshMethod superFinalMethod: superFinalMethods) {
+                // Continue the validation if there is superFinalMethod being implemented!
+                if (!method.getName().equals(superFinalMethod.getName())) continue;
+                if (!Types.isSignatureAssignable(method.getParameterTypes(), superFinalMethod.getParameterTypes(), Types.BSH_ASSIGNABLE)) continue;
+
+                String msg = String.format("Cannot override %s() in %s overridden method is final", method.getName(), StringUtil.typeString(superClass));
+                throw new EvalError(msg, null, null);
+            }
+        }
 
         callstack.pop();
 
@@ -187,9 +207,8 @@ public final class ClassGenerator {
         if ( callstack.top().getName().indexOf("$anon") > -1 ) {
             // anonymous classes need super constructor
             String classBaseName = Types.getBaseName(callstack.top().getName());
-            Invocable con = BshClassManager.memberCache.get(superClass)
-                    .findMethod(superClass.getName(),
-                        This.CONTEXT_ARGS.get().get(classBaseName));
+            // TODO: ver isso!!
+            Invocable con = BshClassManager.memberCache.get(superClass).findMethod(superClass.getName(), This.CONTEXT_ARGS.get().get(classBaseName));
             DelayedEvalBshMethod bm = new DelayedEvalBshMethod(classBaseName, con, callstack.top());
             methods.add(bm);
         }
@@ -296,8 +315,7 @@ public final class ClassGenerator {
         String superName = BSHSUPER + superClass.getSimpleName() + methodName;
 
         // look for the specially named super delegate method
-        Invocable superMethod = Reflect.resolveJavaMethod(clas, superName,
-                Types.getTypes(args), false/*onlyStatic*/);
+        Invocable superMethod = Reflect.resolveJavaMethod(clas, superName, args, false);
         if (superMethod != null) return superMethod.invoke(instance, args);
 
         // No super method, try to invoke regular method

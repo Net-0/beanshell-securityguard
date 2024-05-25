@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 
 /** A namespace in which methods, variables, and imports (class names) live.
  * This is package public because it is used in the implementation of some bsh
@@ -770,9 +771,8 @@ public class NameSpace
      * @throws UtilEvalError the util eval error
      * @see #getMethod(String, Class [], boolean)
      * @see #getMethod(String, Class []) */
-    public BshMethod getMethod(final String name, final Class<?>[] sig)
-            throws UtilEvalError {
-        return this.getMethod(name, sig, false/* declaredOnly */);
+    public BshMethod getMethod(final String name, final Object[] args) throws UtilEvalError {
+        return this.getMethod(name, args, false);
     }
 
     /** Get the bsh method matching the specified signature declared in this
@@ -789,21 +789,20 @@ public class NameSpace
      * @return the BshMethod or null if not found
      * @throws UtilEvalError the util eval error
      * @see bsh.Primitive */
-    public BshMethod getMethod(final String name, final Class<?>[] sig,
-            final boolean declaredOnly) throws UtilEvalError {
+    public BshMethod getMethod(final String name, final Object[] args, final boolean declaredOnly) throws UtilEvalError {
         BshMethod method = null;
         Interpreter.debug("Get method: ", name, " ", this );
         // Change import precedence if we are a class body/instance
         // Get import first. Enum blocks may override class methods.
         if (this.isClass && !this.isEnum && !declaredOnly)
-            method = this.getImportedMethod(name, sig);
+            method = this.getImportedMethod(name, args);
         if (method == null && this.methods.containsKey(name))
-            method = Reflect.findMostSpecificBshMethod(sig, methods.get(name));
+            method = Reflect.findMostSpecificBshMethod(args, methods.get(name));
         if (method == null && !this.isClass && !declaredOnly)
-            method = this.getImportedMethod(name, sig);
+            method = this.getImportedMethod(name, args);
         // try parent
         if (method == null && !declaredOnly && this.parent != null)
-            return this.parent.getMethod(name, sig);
+            return this.parent.getMethod(name, args);
         return method;
     }
 
@@ -864,8 +863,7 @@ public class NameSpace
      * @return a BshMethod, Class, or null if no such command is found.
      * @throws UtilEvalError if loadScriptedCommand throws UtilEvalError i.e. on
      *         errors loading a script that was found */
-    public Object getCommand(final String name, final Class<?>[] argTypes,
-            final Interpreter interpreter) throws UtilEvalError {
+    public Object getCommand(final String name, final Object[] args, final Interpreter interpreter) throws UtilEvalError {
         Interpreter.debug("Get command: ", name);
         final BshClassManager bcm = interpreter.getClassManager();
         // loop backwards for precedence
@@ -879,7 +877,7 @@ public class NameSpace
             URL url = bcm.getResource(scriptPath);
             if (null != url) try {
                 return this.loadScriptedCommand((InputStream) url.getContent(),
-                    name, argTypes, scriptPath, interpreter);
+                    name, args, scriptPath, interpreter);
             } catch (IOException e) { /* ignore */ }
             // Chop leading "/" and change "/" to "."
             String className;
@@ -894,7 +892,7 @@ public class NameSpace
                 return clas;
         }
         if (this.parent != null)
-            return this.parent.getCommand(name, argTypes, interpreter);
+            return this.parent.getCommand(name, args, interpreter);
         else
             return null;
     }
@@ -904,21 +902,16 @@ public class NameSpace
      * @param sig the sig
      * @return the imported method
      * @throws UtilEvalError the util eval error */
-    protected BshMethod getImportedMethod(final String name, final Class<?>[] sig)
-            throws UtilEvalError {
+    protected BshMethod getImportedMethod(final String name, final Object[] args) throws UtilEvalError {
         // Try object imports
         for (final Object object : this.importedObjects) {
-            final Invocable method = Reflect.resolveJavaMethod(
-                   object.getClass(), name, sig, false/* onlyStatic */);
-            if (method != null)
-                return new BshMethod(method, object);
+            final Invocable method = Reflect.resolveJavaMethod(object.getClass(), name, args, false);
+            if (method != null) return new BshMethod(method, object);
         }
         // Try static imports
         for (final Class<?> stat : this.importedStatic) {
-            final Invocable method = Reflect.resolveJavaMethod(
-                    stat, name, sig, true/* onlyStatic */);
-            if (method != null)
-                return new BshMethod(method, null/* object */);
+            final Invocable method = Reflect.resolveJavaMethod(stat, name, args, true);
+            if (method != null) return new BshMethod(method, null);
         }
         return null;
     }
@@ -976,7 +969,7 @@ public class NameSpace
      *         multiple commands in the command path we need to change this to
      *         not throw the exception. */
     private BshMethod loadScriptedCommand(final InputStream in,
-            final String name, final Class<?>[] argTypes,
+            final String name, final Object[] args,
             final String resourcePath, final Interpreter interpreter)
             throws UtilEvalError {
         try (FileReader reader = new FileReader(in)) {
@@ -989,7 +982,7 @@ public class NameSpace
             throw new UtilEvalError("Error loading script: " + e.getMessage(), e);
         }
         // Look for the loaded command
-        final BshMethod meth = this.getMethod(name, argTypes);
+        final BshMethod meth = this.getMethod(name, args);
         /* if (meth == null) throw new UtilEvalError("Loaded resource: " +
          * resourcePath +
          * "had an error or did not contain the correct method"); */
@@ -1269,11 +1262,9 @@ public class NameSpace
     protected Object invokeCommand(final String commandName, final Object[] args,
             final Interpreter interpreter, final CallStack callstack,
             final Node callerInfo, final boolean ignoreInvoke) throws EvalError {
-        Class<?>[] argTypes = Types.getTypes( args );
         Object commandObject;
         try {
-            commandObject = getCommand(
-                commandName, argTypes, interpreter );
+            commandObject = getCommand( commandName, args, interpreter );
         } catch ( UtilEvalError e ) {
             throw e.toEvalError("Error loading command: ",
                 callerInfo, callstack );
@@ -1291,7 +1282,7 @@ public class NameSpace
                     return result;
             }
             throw new EvalError( "Command not found: " +
-                StringUtil.methodString( commandName, argTypes ),
+                StringUtil.methodString( commandName, Types.getTypes(args) ),
                 callerInfo, callstack );
         }
 
@@ -1326,8 +1317,7 @@ public class NameSpace
 
         BshMethod invokeMethod = null;
         try {
-            invokeMethod = getMethod(
-                "invoke", new Class [] { null, null } );
+            invokeMethod = getMethod("invoke", new Object[] { null, null });
         } catch ( UtilEvalError e ) {
             throw e.toEvalError(
                 "Local method invocation", callerInfo, callstack );
@@ -1509,9 +1499,7 @@ public class NameSpace
             final Interpreter interp) throws UtilEvalError {
         final String accessorName = Reflect.accessorName(Reflect.SET_PREFIX, propName);
         Object val = Primitive.unwrap(value);
-        final Class<?>[] classArray = new Class<?>[] {
-                val == null ? null : val.getClass()};
-        final BshMethod m = this.getMethod(accessorName, classArray);
+        final BshMethod m = this.getMethod(accessorName, new Object[] { val });
         if (m != null)
             try {
                 this.invokeMethod(accessorName, new Object[] {value}, interp);
@@ -1550,7 +1538,6 @@ public class NameSpace
         }
     }
 
-
     NameSpace copy() {
         try {
             final NameSpace clone = (NameSpace) clone();
@@ -1583,6 +1570,26 @@ public class NameSpace
             return null;
         }
         return new ArrayList<T>(list);
+    }
+
+    /** Returns a new {@link NameSpace} to be used by lambda expressions; an {@link NameSpace} where all inherited variables are final, as they're in standard Java */
+    protected NameSpace toLambdaNameSpace() {
+        NameSpace lambdaNS = this.copy();
+        Stack<NameSpace> parents = new Stack<>();
+        for (NameSpace ns = this.parent; ns != null; ns = ns.parent) parents.add(ns);
+        while (!parents.isEmpty()) { // Add all variables from the most far parent to 'this.parent'
+            NameSpace parent = parents.pop();
+            if (parent.isClass || parent.isEnum) continue;
+            lambdaNS.variables.putAll(parent.variables);
+        }
+
+        // Change all variables to be final
+        lambdaNS.variables.replaceAll((k, v) -> {
+            Variable clone = v.clone();
+            clone.modifiers.addModifier("final");
+            return clone;
+        });
+        return lambdaNS;
     }
 
 }

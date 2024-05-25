@@ -37,8 +37,7 @@ public class PreparsedScript {
                     + "} return this;"),
                 interpreter.globalNameSpace,
                 interpreter.showEvalString("pre-parsed script", source));
-            prepared = callable.getNameSpace()
-                        .getMethod("__execute", Reflect.ZERO_TYPES, false);
+            prepared = callable.getNameSpace().getMethod("__execute", new Object[0], false);
         } catch (final UtilEvalError e) {
             throw new IllegalStateException(e);
         }

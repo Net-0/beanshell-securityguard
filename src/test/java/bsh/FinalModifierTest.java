@@ -1,9 +1,5 @@
 package bsh;
 
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.runner.RunWith;
-
 import static bsh.TestUtil.eval;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -11,7 +7,9 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertEquals;
 
 import org.junit.Rule;
-
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.junit.runner.RunWith;
 
 @RunWith(FilteredTestRunner.class)
 public class FinalModifierTest {
@@ -59,6 +57,23 @@ public class FinalModifierTest {
         );
     }
 
+    // @Test
+    // public void non_assignment_to_static_final_field_should_not_be_allowed_2() throws Exception {
+    //     thrown.expect(EvalError.class);
+    //     thrown.expectMessage(containsString("Static final variable _staticVar is not initialized."));
+
+    //     eval(
+    //         "class X6 {",
+    //             "final String toString() { return null; }",
+    //         "}",
+    //         "class X7 {",
+    //             "static final Object _staticVar;",
+    //             "String toString() { return null; }",
+    //         "}",
+    //         "X7._staticVar;" // lazy initialize
+    //     );
+    // }
+
     @Test
     public void non_assignment_to_static_final_field_late_init_should_not_be_allowed() throws Throwable {
         thrown.expect(UtilEvalError.class);
@@ -78,6 +93,7 @@ public class FinalModifierTest {
         }
     }
 
+    // REMEMBER: This test makes no sense, because we'll have errors with '_staticVar' if we try to override a final method! see 'non_assignment_to_static_final_field_should_not_be_allowed_2'
     @Test
     public void non_assignment_to_static_final_field_no_initialize_should_be_allowed() throws Exception {
         Class<?> clas = (Class<?>) eval(

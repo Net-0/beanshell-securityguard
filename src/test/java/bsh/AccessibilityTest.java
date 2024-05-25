@@ -1,11 +1,11 @@
 package bsh;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-
 import static bsh.TestUtil.eval;
 import static bsh.TestUtil.toMap;
 import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
 
 @RunWith(FilteredTestRunner.class)
 public class AccessibilityTest {

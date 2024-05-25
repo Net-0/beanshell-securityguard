@@ -26,6 +26,12 @@
 
 package bsh;
 
+import static bsh.Capabilities.haveAccessibility;
+import static bsh.Reflect.isPackageAccessible;
+import static bsh.Reflect.isPackageScope;
+import static bsh.Reflect.isPrivate;
+import static bsh.Reflect.isPublic;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
@@ -34,20 +40,15 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import bsh.util.ReferenceCache;
-
-import static bsh.Reflect.isPublic;
-import static bsh.util.ReferenceCache.Type;
-import static bsh.Reflect.isPrivate;
-import static bsh.Reflect.isPackageAccessible;
-import static bsh.Reflect.isPackageScope;
-import static bsh.Capabilities.haveAccessibility;
+import bsh.util.ReferenceCache.Type;
 
 /**
     BshClassManager manages all classloading in BeanShell.
@@ -98,10 +99,8 @@ public class BshClassManager {
 
     /** Class member cached value instance **/
     static final class MemberCache {
-        private final Map<String,List<Invocable>> cache
-                            = new ConcurrentHashMap<>();
-        private final Map<String,Invocable> fields
-                            = new ConcurrentHashMap<>();
+        private final Map<String, List<Invocable>> cache = new ConcurrentHashMap<>();
+        private final Map<String, FieldAccess> fields = new ConcurrentHashMap<>();
 
         /** Constructor iterates through interfaces and super classes
          * collect and cache field, constructor and method members.
@@ -113,55 +112,34 @@ public class BshClassManager {
          * accessibility is true.
          * @param clazz for whom members are collected */
         public MemberCache(Class<?> clazz) {
-            Class<?> type = clazz;
-            while (type != null) {
-                if (isPackageAccessible(type)
-                    && ((isPackageScope(type) && !isPrivate(type))
-                        || isPublic(type) || haveAccessibility())) {
-                    for (Field f : type.getDeclaredFields())
-                        if (isPublic(f) || haveAccessibility())
-                            cacheMember(Invocable.get(f));
-                    for (Method m : type.getDeclaredMethods())
-                        if (isPublic(m) || haveAccessibility())
-                            if (clazz == type) cacheMember(Invocable.get(m));
-                            else cacheMember(memberCache.get(type)
-                            .findMethod(m.getName(), m.getParameterTypes()));
-                    for (Constructor<?> c: type.getDeclaredConstructors())
-                        if (clazz == type) cacheMember(Invocable.get(c));
-                        else cacheMember(memberCache.get(type)
-                            .findMethod(c.getName(), c.getParameterTypes()));
-                }
-                processInterfaces(type.getInterfaces());
-                type = type.getSuperclass();
-                memberCache.init(type);
+            if (isPackageAccessible(clazz) && ((isPackageScope(clazz) && !isPrivate(clazz)) || isPublic(clazz) || haveAccessibility())) {
+                for (Field f : clazz.getDeclaredFields())
+                    if (isPublic(f) || haveAccessibility())
+                        this.fields.putIfAbsent(f.getName(), Invocable.get(f));
+                for (Method m : clazz.getDeclaredMethods())
+                    if (isPublic(m) || haveAccessibility())
+                        cacheMember(Invocable.get(m));
+                for (Constructor<?> c: clazz.getDeclaredConstructors())
+                    cacheMember(clazz.getName(), Invocable.get(c));
             }
-        }
 
-        /** Recursive processing of interfaces.
-         * Methods are stored by reference.
-         * @param interfaces for whom members are collected */
-        private void processInterfaces(Class<?>[] interfaces) {
-            for (Class<?> intr : interfaces) {
-                if (isPackageAccessible(intr)) {
-                    memberCache.init(intr);
-                    for (Field f : intr.getDeclaredFields())
-                            cacheMember(Invocable.get(f));
-                    for (Method m: intr.getDeclaredMethods())
-                        if (isPublic(m) || haveAccessibility())
-                            cacheMember(memberCache.get(intr)
-                            .findMethod(m.getName(), m.getParameterTypes()));
+            // A list of Class<?> to inherit methods and fields
+            List<Class<?>> classesToInherit = new ArrayList<>(Arrays.asList(clazz.getInterfaces()));
+            if (clazz.getSuperclass() != null) classesToInherit.add(clazz.getSuperclass());
+
+            // Start tasks to create a MemberCache to each Class<?> in parallel
+            for (Class<?> classToInherit: classesToInherit) memberCache.init(classToInherit);
+
+            // Inherit methods and fields
+            for (Class<?> classToInherit: classesToInherit) {
+                MemberCache cacheToInherit = memberCache.get(classToInherit);
+                for (FieldAccess field: cacheToInherit.fields.values())
+                    this.fields.putIfAbsent(field.getName(), field);
+                for (Entry<String, List<Invocable>> entry: cacheToInherit.cache.entrySet()) {
+                    this.cache.putIfAbsent(entry.getKey(), new ArrayList<>());
+                    this.cache.get(entry.getKey()).addAll(entry.getValue());
                 }
-                processInterfaces(intr.getInterfaces());
             }
-        }
-
-        /** Cache a field member.
-         * @param member to cache
-         * @return true if this is a new member */
-        private boolean cacheMember(FieldAccess member) {
-            if (!hasField(member.getName()))
-                return null == fields.put(member.getName(), member);
-            return false;
         }
 
         /** Cache constructors and methods.
@@ -181,8 +159,7 @@ public class BshClassManager {
                 ch[0] = Character.toLowerCase(ch[0]);
                 propName = new String(ch);
             }
-            return cacheMember(name, member)
-                && cacheMember(propName, member);
+            return cacheMember(name, member) && cacheMember(propName, member);
         }
 
         /** Cache name associated with a list of members.
@@ -190,25 +167,19 @@ public class BshClassManager {
          * @param member invocable instance
          * @return true if the cache changed */
         private boolean cacheMember(String name, Invocable member) {
-            if (!hasMember(name))
-                return null == cache.put(name,
-                        Collections.singletonList(member));
-            else if (memberCount(name) == 1)
-                cache.put(name, new ArrayList<>(members(name)));
-            return members(name).add(member);
+            this.cache.putIfAbsent(name, new ArrayList<>());
+            return this.cache.get(name).add(member);
         }
 
-        /** Find the most specific member for the given parameter types.
+        /** Find the most specific member for the given arguments.
          * If there is only 1 member it will always be returned.
          * @param list of possible members
-         * @param types of parameters
+         * @param args argument values
          * @return the most specific member or null */
-        private Invocable findBest(List<Invocable> list, Class<?>[] types) {
-            if (list.isEmpty())
-                return null;
-            if (list.size() == 1)
-                return list.get(0);
-            return Reflect.findMostSpecificInvocable(types, list);
+        private Invocable findBest(List<Invocable> list, Object[] args) {
+            if (list.isEmpty()) return null;
+            if (list.size() == 1) return list.get(0);
+            return Reflect.findMostSpecificInvocable(args, list);
         }
 
         /** Find invocable for the given name and arguments.
@@ -217,17 +188,7 @@ public class BshClassManager {
          * @param args parameter argument values
          * @return the most specific member or null */
         public Invocable findMethod(String name, Object... args) {
-            return findMethod(name, Types.getTypes(args));
-        }
-
-        /** Find invocable for the given name and parameter types.
-         * @param name of member
-         * @param types of parameters
-         * @return the most specific member or null */
-        public Invocable findMethod(String name, Class<?>... types) {
-            if (!hasMember(name))
-                return null;
-            return findBest(members(name), types);
+            return hasMember(name) ? findBest(members(name), args) : null;
         }
 
         /** Find static method for name. Used for static import.
@@ -271,8 +232,8 @@ public class BshClassManager {
          * @param name of member
          * @param types of parameters
          * @return index of the most specific member or -1 */
-        public int findMemberIndex(String name, Class<?>[] types) {
-           return Reflect.findMostSpecificInvocableIndex(types, members(name));
+        public int findMemberIndex(String name, Object[] args) {
+            return Reflect.findMostSpecificInvocableIndex(args, members(name));
         }
 
         /** Retrieve list of member associated with name.

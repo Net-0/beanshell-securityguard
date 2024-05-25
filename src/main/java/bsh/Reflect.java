@@ -25,6 +25,11 @@
  *****************************************************************************/
 package bsh;
 
+import static bsh.Capabilities.haveAccessibility;
+import static bsh.This.Keys.BSHCLASSMODIFIERS;
+import static bsh.This.Keys.BSHSTATIC;
+import static bsh.This.Keys.BSHTHIS;
+
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Member;
@@ -38,16 +43,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.regex.Pattern;
 import java.util.Objects;
 import java.util.WeakHashMap;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static bsh.This.Keys.BSHTHIS;
-import static bsh.This.Keys.BSHSTATIC;
-import static bsh.This.Keys.BSHCLASSMODIFIERS;
-import static bsh.Capabilities.haveAccessibility;
 /**
  * All of the reflection API code lies here.  It is in the form of static
  * utilities.  Maybe this belongs in LHS.java or a generic object
@@ -385,8 +385,7 @@ public final class Reflect {
             throw new UtilTargetError( new NullPointerException(
                 "Attempt to invoke method " +name+" on null value" ) );
 
-        Class<?>[] types = Types.getTypes(args);
-        Invocable method = resolveJavaMethod( clas, name, types, staticOnly );
+        Invocable method = resolveJavaMethod( clas, name, args, staticOnly );
         if ( null != bcm && bcm.getStrictJava()
                 && method != null && method.getDeclaringClass().isInterface()
                 && method.getDeclaringClass() != clas
@@ -397,7 +396,7 @@ public final class Reflect {
         if ( method == null )
             throw new ReflectError(
                 ( staticOnly ? "Static method " : "Method " )
-                + StringUtil.methodString(name, types) +
+                + StringUtil.methodString(name, Types.getTypes(args)) +
                 " not found in class'" + clas.getName() + "'");
 
         return method;
@@ -430,14 +429,11 @@ public final class Reflect {
             The method located must be static, the object param may be null.
         @return the method or null if no matching method was found.
     */
-    protected static Invocable resolveJavaMethod(
-            Class<?> clas, String name, Class<?>[] types,
-            boolean staticOnly ) throws UtilEvalError {
+    protected static Invocable resolveJavaMethod(Class<?> clas, String name, Object[] args, boolean staticOnly) throws UtilEvalError {
         if ( clas == null )
             throw new InterpreterError("null class");
 
-        Invocable method = BshClassManager.memberCache
-                .get(clas).findMethod(name, types);
+        Invocable method = BshClassManager.memberCache.get(clas).findMethod(name, args);
         Interpreter.debug("resolved java method: ", method, " on class: ", clas);
         checkFoundStaticMethod( method, staticOnly, clas );
         return method;
@@ -482,8 +478,7 @@ public final class Reflect {
             types = Stream.concat(Stream.of(object.getClass()),
                     Stream.of(types)).toArray(Class[]::new);
         Interpreter.debug("Looking for most specific constructor: ", clas);
-        Invocable con = BshClassManager.memberCache.get(clas)
-                .findMethod(clas.getName(), types);
+        Invocable con = BshClassManager.memberCache.get(clas).findMethod(clas.getName(), args);
         if ( con == null || (args.length != con.getParameterCount()
                     && !con.isVarArgs() && !con.isInnerClass()))
             throw cantFindConstructor( clas, types );
@@ -512,11 +507,9 @@ public final class Reflect {
      * @param methods the set of candidate {@link BshMethod}s which
      * differ only in the types of their arguments.
      */
-    public static BshMethod findMostSpecificBshMethod(
-            Class<?>[] idealMatch, List<BshMethod> methods ) {
-        Interpreter.debug("find most specific BshMethod for: "+
-                          Arrays.toString(idealMatch));
-        int match = findMostSpecificBshMethodIndex( idealMatch, methods );
+    public static BshMethod findMostSpecificBshMethod(Object[] args, List<BshMethod> methods ) {
+        Interpreter.debug("find most specific BshMethod for: " + Arrays.toString(args));
+        int match = findMostSpecificBshMethodIndex( args, methods );
         return match == -1 ? null : methods.get(match);
     }
 
@@ -535,8 +528,7 @@ public final class Reflect {
      * @param methods the set of candidate BshMethods which differ only in the
      * types of their arguments.
      */
-    public static int findMostSpecificBshMethodIndex(Class<?>[] idealMatch,
-                                                      List<BshMethod> methods) {
+    public static int findMostSpecificBshMethodIndex(Object[] args, List<BshMethod> methods) {
         for (int i=0; i<methods.size(); i++)
             Interpreter.debug("  "+i+":"+methods.get(i).toString()+" "+methods.get(i).getClass().getName());
 
@@ -551,7 +543,7 @@ public final class Reflect {
         int i=0;
         for( BshMethod m : methods ) {
             Class<?>[] parameterTypes = m.getParameterTypes();
-            if (idealMatch.length == parameterTypes.length) {
+            if (args.length == parameterTypes.length) {
                 remap.add(i);
                 candidateSigs.add( parameterTypes );
             }
@@ -559,7 +551,7 @@ public final class Reflect {
         }
         Class<?>[][] sigs = candidateSigs.toArray(new Class[candidateSigs.size()][]);
 
-        int match = findMostSpecificSignature( idealMatch, sigs );
+        int match = findMostSpecificSignature( args, sigs );
         if (match >= 0) {
             match = remap.get(match);
             Interpreter.debug(" remap: "+remap);
@@ -577,14 +569,11 @@ public final class Reflect {
         i=0;
         for( BshMethod m : methods ) {
             Class<?>[] parameterTypes = m.getParameterTypes();
-            if (m.isVarArgs()
-                && idealMatch.length >= parameterTypes.length-1 ) {
-                Class<?>[] candidateSig = new Class[idealMatch.length];
-                System.arraycopy(parameterTypes, 0, candidateSig, 0,
-                                 parameterTypes.length-1);
+            if (m.isVarArgs() && args.length >= parameterTypes.length-1 ) {
+                Class<?>[] candidateSig = new Class[args.length];
+                System.arraycopy(parameterTypes, 0, candidateSig, 0, parameterTypes.length-1);
                 Class<?> arrayCompType = parameterTypes[parameterTypes.length-1].getComponentType();
-                Arrays.fill(candidateSig, parameterTypes.length-1,
-                            idealMatch.length, arrayCompType);
+                Arrays.fill(candidateSig, parameterTypes.length-1, args.length, arrayCompType);
                 remap.add(i);
                 candidateSigs.add( candidateSig );
             }
@@ -592,7 +581,7 @@ public final class Reflect {
         }
 
         sigs = candidateSigs.toArray(new Class[candidateSigs.size()][]);
-        match = findMostSpecificSignature( idealMatch, sigs);
+        match = findMostSpecificSignature( args, sigs);
         if (match >= 0) {
             match = remap.get(match);
             Interpreter.debug(" remap (varargs): "+Arrays.toString(remap.toArray(new Integer[0])));
@@ -609,16 +598,14 @@ public final class Reflect {
      * each method.
      *
      * @param idealMatch the signature to look for
-     * @param methods the set of candidate {@link Invocable}s which
+     * @param invocables the set of candidate {@link Invocable}s which
      * differ only in the types of their arguments.
      */
-    public static Invocable findMostSpecificInvocable(
-            Class<?>[] idealMatch, List<Invocable> methods ) {
-        Interpreter.debug("find most specific Invocable for: "+
-                          Arrays.toString(idealMatch));
+    public static Invocable findMostSpecificInvocable( Object[] args, List<Invocable> invocables ) {
+        Interpreter.debug("find most specific Invocable for: " + Arrays.toString(args));
 
-        int match = findMostSpecificInvocableIndex( idealMatch, methods );
-        return match == -1 ? null : methods.get(match);
+        int match = findMostSpecificInvocableIndex( args, invocables );
+        return match == -1 ? null : invocables.get(match);
     }
 
     /**
@@ -636,13 +623,12 @@ public final class Reflect {
      * derived return type of otherwise identical best matches.
      *
      * @param idealMatch the signature to look for
-     * @param methods the set of candidate method which differ only in the
+     * @param invocables the set of candidate invocables which differ only in the
      * types of their arguments.
      */
-    public static int findMostSpecificInvocableIndex(Class<?>[] idealMatch,
-                                                      List<Invocable> methods) {
-        for (int i=0; i<methods.size(); i++)
-            Interpreter.debug("  "+i+"="+methods.get(i).toString());
+    public static int findMostSpecificInvocableIndex(Object[] args, List<Invocable> invocables) {
+        for (int i=0; i<invocables.size(); i++)
+            Interpreter.debug("  "+i+"="+invocables.get(i).toString());
 
         /*
          * Filter for non-varArgs method signatures of the same arity
@@ -651,9 +637,9 @@ public final class Reflect {
         // array to remap the index in the new list
         ArrayList<Integer> remap = new ArrayList<>();
         int i=0;
-        for( Invocable method : methods ) {
+        for( Invocable method : invocables ) {
             Class<?>[] parameterTypes = method.getParameterTypes();
-            if (idealMatch.length == parameterTypes.length) {
+            if (args.length == parameterTypes.length) {
                 remap.add(i);
                 candidateSigs.add( parameterTypes );
             }
@@ -661,7 +647,7 @@ public final class Reflect {
         }
         Class<?>[][] sigs = candidateSigs.toArray(new Class[candidateSigs.size()][]);
 
-        int match = findMostSpecificSignature( idealMatch, sigs );
+        int match = findMostSpecificSignature( args, sigs );
         if (match >= 0) {
             match = remap.get(match);
             Interpreter.debug(" remap="+Arrays.toString(remap.toArray(new Integer[0])));
@@ -677,15 +663,12 @@ public final class Reflect {
         candidateSigs.clear();
         remap.clear();
         i=0;
-        for( Invocable method : methods ) {
+        for( Invocable method : invocables ) {
             Class<?>[] parameterTypes = method.getParameterTypes();
-            if (method.isVarArgs()
-                && idealMatch.length >= parameterTypes.length-1 ) {
-                Class<?>[] candidateSig = new Class[idealMatch.length];
-                System.arraycopy(parameterTypes, 0, candidateSig, 0,
-                                 parameterTypes.length-1);
-                Arrays.fill(candidateSig, parameterTypes.length-1,
-                            idealMatch.length, method.getVarArgsComponentType());
+            if (method.isVarArgs() && args.length >= parameterTypes.length-1 ) {
+                Class<?>[] candidateSig = new Class[args.length];
+                System.arraycopy(parameterTypes, 0, candidateSig, 0, parameterTypes.length-1);
+                Arrays.fill(candidateSig, parameterTypes.length-1, args.length, method.getVarArgsComponentType());
                 remap.add(i);
                 candidateSigs.add( candidateSig );
             }
@@ -693,7 +676,7 @@ public final class Reflect {
         }
 
         sigs = candidateSigs.toArray(new Class[candidateSigs.size()][]);
-        match = findMostSpecificSignature( idealMatch, sigs);
+        match = findMostSpecificSignature( args, sigs);
 
         /*
          * return the remaped value so that the index is relative
@@ -727,37 +710,30 @@ public final class Reflect {
      performance.  Method selection is now cached at a high level, so a few
      friendly extraneous tests shouldn't be a problem.
     */
-    static int findMostSpecificSignature(
-        Class<?>[] idealMatch, Class<?>[][] candidates ) {
+    static int findMostSpecificSignature(Object[] args, Class<?>[][] candidates) {
+        int[] rounds = { Types.JAVA_BASE_ASSIGNABLE, Types.JAVA_BOX_TYPES_ASSIGABLE, Types.BSH_ASSIGNABLE };
+        Class<?>[] idealMatch = Types.getTypes(args);
 
-        for ( int round = Types.FIRST_ROUND_ASSIGNABLE;
-                round <= Types.LAST_ROUND_ASSIGNABLE; round++ ) {
+        for (int round: rounds) {
             Class<?>[] bestMatch = null;
             int bestMatchIndex = -1;
 
             for (int i=0; i < candidates.length; i++) {
                 Class<?>[] targetMatch = candidates[i];
-                if (null != bestMatch && Types
-                        .areSignaturesEqual(targetMatch, bestMatch))
-                    // overridden keep first
-                    continue;
+                if (null != bestMatch && Types.areSignaturesEqual(targetMatch, bestMatch)) continue;
 
-                // If idealMatch fits targetMatch and this is the first match
-                // or targetMatch is more specific than the best match, make it
-                // the new best match.
-                if ( Types.isSignatureAssignable(
-                        idealMatch, targetMatch, round )
-                    && ( bestMatch == null
-                        || Types.areSignaturesEqual(idealMatch, targetMatch)
-                    || ( Types.isSignatureAssignable(targetMatch, bestMatch,
-                                Types.JAVA_BASE_ASSIGNABLE)
-                       && !Types.areSignaturesEqual(idealMatch, bestMatch)))) {
+                // Perfect match, we can already return it
+                if (Types.areSignaturesEqual(idealMatch, targetMatch)) return i;
+
+                boolean validSignature = Types.isSignatureAssignable(args, idealMatch, targetMatch, round);
+                boolean betterMatch = bestMatch == null || Types.isSignatureAssignable(args, targetMatch, bestMatch, Types.JAVA_BASE_ASSIGNABLE);
+
+                if (validSignature && betterMatch) {
                     bestMatch = targetMatch;
                     bestMatchIndex = i;
                 }
             }
-            if ( bestMatch != null )
-                return bestMatchIndex;
+            if (bestMatch != null) return bestMatchIndex;
         }
         return -1;
     }
@@ -1057,32 +1033,32 @@ public final class Reflect {
     /*
      * Get method from class static namespace
      */
-    public static BshMethod getMethod(Class<?> type, String name, Class<?>[] sig) {
-        return getMethod(getThisNS(type), name, sig);
+    public static BshMethod getMethod(Class<?> type, String name, Object[] args) {
+        return getMethod(getThisNS(type), name, args);
     }
 
     /*
      * Get method from object instance namespace
      */
-    public static BshMethod getMethod(Object object, String name, Class<?>[] sig) {
-        return getMethod(getThisNS(object), name, sig);
+    public static BshMethod getMethod(Object object, String name, Object[] args) {
+        return getMethod(getThisNS(object), name, args);
     }
 
     /*
      * Get declared method from namespace
      */
-    public static BshMethod getMethod(NameSpace ns, String name, Class<?>[] sig) {
-        return getMethod(ns, name, sig, true);
+    public static BshMethod getMethod(NameSpace ns, String name, Object[] args) {
+        return getMethod(ns, name, args, true);
     }
 
     /*
      * Get method from namespace
      */
-    public static BshMethod getMethod(NameSpace ns, String name, Class<?>[] sig, boolean declaredOnly) {
+    public static BshMethod getMethod(NameSpace ns, String name, Object[] args, boolean declaredOnly) {
         if (null == ns)
             return null;
         try {
-            return ns.getMethod(name, sig, declaredOnly);
+            return ns.getMethod(name, args, declaredOnly);
         } catch (Exception e) {
             return null;
         }
@@ -1091,12 +1067,12 @@ public final class Reflect {
     /*
      * Get method from either class static or object instance namespaces
      */
-    public static BshMethod getDeclaredMethod(Class<?> type, String name, Class<?>[] sig) {
+    public static BshMethod getDeclaredMethod(Class<?> type, String name, Object[] args) {
         if (!isGeneratedClass(type))
             return null;
-        BshMethod meth = getMethod(type, name, sig);
+        BshMethod meth = getMethod(type, name, args);
         if (null == meth && !type.isInterface())
-            return getMethod(getNewInstance(type), name, sig);
+            return getMethod(getNewInstance(type), name, args);
         return meth;
     }
 

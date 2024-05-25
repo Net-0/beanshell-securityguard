@@ -48,6 +48,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import bsh.org.objectweb.asm.ClassWriter;
+
 
 /**
     'This' is the type of bsh scripted objects.
@@ -380,8 +382,7 @@ public final class This implements java.io.Serializable, Runnable
 
         // Find the bsh method
         Class<?>[] types = Types.getTypes( args );
-        BshMethod bshMethod = Reflect.getMethod(
-            namespace, methodName, types, declaredOnly );
+        BshMethod bshMethod = Reflect.getMethod(namespace, methodName, args, declaredOnly );
 
         if ( bshMethod != null )
             return bshMethod.invoke( args, interpreter, callstack, callerInfo );
@@ -620,21 +621,19 @@ public final class This implements java.io.Serializable, Runnable
                     "Error evaluating constructor args: " + e, e);
         }
 
-        Class<?>[] argTypes = Types.getTypes(args);
-        args = Primitive.unwrap(args);
+        Object[] unwrappedArgs = Primitive.unwrap(args);
 
         // find the matching super() constructor for the args
         if (altConstructor.equals("super")) {
-            int i = BshClassManager.memberCache.get(superClass)
-                    .findMemberIndex(superClass.getName(), argTypes);
+            int i = BshClassManager.memberCache.get(superClass).findMemberIndex(superClass.getName(), unwrappedArgs);
             if (i == -1)
                 throw new InterpreterError(
                         "can't find super constructor for args!");
-            return new ConstructorArgs(i, args);
+            return new ConstructorArgs(i, unwrappedArgs);
         }
 
         // find the matching this() constructor for the args
-        int i = Reflect.findMostSpecificBshMethodIndex(argTypes, Arrays.asList(constructors));
+        int i = Reflect.findMostSpecificBshMethodIndex(args, Arrays.asList(constructors));
         if (i == -1)
             throw new InterpreterError("can't find this constructor for args!");
         // this() constructors come after super constructors in the table
@@ -648,7 +647,7 @@ public final class This implements java.io.Serializable, Runnable
         if (selector == ourSelector)
             throw new InterpreterError("Recursive constructor call.");
 
-        return new ConstructorArgs(selector, args);
+        return new ConstructorArgs(selector, unwrappedArgs);
     }
 
     /**
@@ -676,8 +675,7 @@ public final class This implements java.io.Serializable, Runnable
                 args = This.CONTEXT_ARGS.get().remove(instance.toString());
 
             // Find the constructor (now in the instance namespace)
-            BshMethod constructor = instanceNameSpace.getMethod(
-                Types.getBaseName(className), Types.getTypes(args), true/*declaredOnly*/);
+            BshMethod constructor = instanceNameSpace.getMethod(Types.getBaseName(className), args, true);
 
             // if args, we must have constructor
             if (args.length > 0 && constructor == null)

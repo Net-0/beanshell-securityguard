@@ -46,7 +46,6 @@ public class FilteredTestRunner extends BlockJUnit4ClassRunner {
                     final TestFilter testFilter = (TestFilter) Reflect.getNewInstance(categoryClass);
                     if (testFilter.skip()) {
                         notifier.fireTestIgnored(description);
-//                            System.out.println("skipping test " + method.getMethod() + " due filter " + categoryClass.getSimpleName());
                         return;
                     }
                 }

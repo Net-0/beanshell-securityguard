@@ -2,10 +2,6 @@ package bsh;
 
 
 import static bsh.TestUtil.eval;
-
-import org.junit.Test;
-import org.junit.runner.RunWith;
-
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.arrayWithSize;
 import static org.hamcrest.Matchers.containsString;
@@ -24,6 +20,9 @@ import java.util.Arrays;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
 
 @RunWith(FilteredTestRunner.class)
 public class ReflectTest {
@@ -181,11 +180,10 @@ public class ReflectTest {
             "}",
             "return new T9();"
         );
-        BshMethod m2 = Reflect.getMethod(object, "m2", new Class<?>[0]);
+        BshMethod m2 = Reflect.getMethod(object, "m2", new Object[0]);
         assertNotNull("get method m2 is not null", m2);
         assertEquals("method get is m2", "m2", m2.getName());
-        assertNotNull("gen method sm2 is not null",
-                Reflect.getMethod(object, "sm2", new Class<?>[0]));
+        assertNotNull("gen method sm2 is not null", Reflect.getMethod(object, "sm2", new Object[0]));
     }
 
     @Test
@@ -234,11 +232,11 @@ public class ReflectTest {
             "}",
             "return T11.class;"
         );
-        BshMethod m2 = Reflect.getDeclaredMethod(type, "m2", new Class<?>[0]);
+        BshMethod m2 = Reflect.getDeclaredMethod(type, "m2", new Object[0]);
         assertNotNull("get method m2 is not null", m2);
         assertEquals("method get is m2", "m2", m2.getName());
         assertNotNull("gen method sm2 is not null",
-                Reflect.getDeclaredMethod(type, "sm2", new Class<?>[0]));
+                Reflect.getDeclaredMethod(type, "sm2", new Object[0]));
     }
 
     @Test
@@ -689,31 +687,31 @@ public class ReflectTest {
      */
     @Test
     public void findMostSpecificSignature() {
-        int value = Reflect.findMostSpecificSignature(new Class[]{null}, new Class[][]{
+        int value = Reflect.findMostSpecificSignature(new Object[]{null}, new Class[][]{
               {Double.TYPE}, {Double.class}, {Number.class}, {Object.class}
         });
         assertEquals("most specific Double class", 1, value);
-        value = Reflect.findMostSpecificSignature(new Class[]{null}, new Class[][]{
+        value = Reflect.findMostSpecificSignature(new Object[]{null}, new Class[][]{
               {Number.class}, {Object.class}, {Double.class}, {Double.TYPE}
         });
         assertEquals("most specific Double class", 2, value);
-        value = Reflect.findMostSpecificSignature(new Class[]{null}, new Class[][]{
+        value = Reflect.findMostSpecificSignature(new Object[]{null}, new Class[][]{
               {Object.class}, {Number.class}, {Double.TYPE}, {Double.class}
         });
         assertEquals("most specific Double class", 3, value);
-        value = Reflect.findMostSpecificSignature(new Class[]{null}, new Class[][]{
+        value = Reflect.findMostSpecificSignature(new Object[]{null}, new Class[][]{
             {Double.TYPE}, {char[].class}, {Integer.class}, {String.class}
         });
         assertEquals("most specific String class", 3, value);
-        // value = Reflect.findMostSpecificSignature(new Class[]{null}, new Class[][]{
+        // value = Reflect.findMostSpecificSignature(new Object[]{null}, new Class[][]{
         //     {Double.TYPE}, {char[].class}, {Number.class}, {Integer.class}
         // });
         // assertEquals("most specific char[] class", 1, value);
-        // value = Reflect.findMostSpecificSignature(new Class[]{null}, new Class[][]{
+        // value = Reflect.findMostSpecificSignature(new Object[]{null}, new Class[][]{
         //     {Double.TYPE}, {char[].class}, {Object.class}, {Boolean.TYPE}
         // });
         // assertEquals("most specific Object class", 2, value);
-        // value = Reflect.findMostSpecificSignature(new Class[]{null}, new Class[][]{
+        // value = Reflect.findMostSpecificSignature(new Object[]{null}, new Class[][]{
         //     {Double.TYPE}, {char[].class}, {Boolean.TYPE}
         // });
         // assertEquals("most specific char[] class", 1, value);

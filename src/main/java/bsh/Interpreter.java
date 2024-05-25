@@ -455,12 +455,10 @@ public class Interpreter
      * @param clas with static main method.
      * @param args the string arguments.
      * @throws Exception thrown if something fails. */
-    public static void invokeMain(Class<?> clas, String[] args)
-            throws Exception {
-        Invocable main = Reflect.resolveJavaMethod(clas, "main",
-                new Class[] {String[].class}, true/*onlyStatic*/);
-        if ( null != main )
-            main.invoke(null, new Object[] {args});
+    public static void invokeMain(Class<?> clas, String[] args) throws Exception {
+        Object[] _args = { args };
+        Invocable main = Reflect.resolveJavaMethod(clas, "main", _args, true);
+        if ( null != main ) main.invoke(null, _args);
     }
 
     /** Run interactively. (printing prompts, etc.) */

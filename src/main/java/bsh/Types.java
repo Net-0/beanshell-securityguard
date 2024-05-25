@@ -29,11 +29,11 @@ package bsh;
 import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.AbstractMap.SimpleEntry;
 import java.util.Map.Entry;
 
 /**
@@ -127,12 +127,7 @@ class Types {
     static final int
         JAVA_BASE_ASSIGNABLE = 1,
         JAVA_BOX_TYPES_ASSIGABLE = 2,
-        JAVA_VARARGS_ASSIGNABLE = 3,
         BSH_ASSIGNABLE = 4;
-
-    static final int
-        FIRST_ROUND_ASSIGNABLE = JAVA_BASE_ASSIGNABLE,
-        LAST_ROUND_ASSIGNABLE = BSH_ASSIGNABLE;
 
     /**
         Special value that indicates by identity that the result of a cast
@@ -193,6 +188,15 @@ class Types {
        return Primitive.unwrap(arg).getClass();
     }
 
+    static boolean isAssignable(Class<?> from, Class<?> to, int round) {
+        switch (round) {
+            case JAVA_BASE_ASSIGNABLE: return isJavaBaseAssignable(to, from);
+            case JAVA_BOX_TYPES_ASSIGABLE: return isJavaBoxTypesAssignable(to, from);
+            case BSH_ASSIGNABLE: return isBshAssignable(to, from);
+            default: throw new InterpreterError("bad case");
+        }
+    }
+
     /**
      Is the 'from' signature (argument types) assignable to the 'to'
      signature (candidate method types)
@@ -200,34 +204,22 @@ class Types {
      indicating a loose type and matching anything.
      */
     /* Should check for strict java here and limit to isJavaAssignable() */
-    static boolean isSignatureAssignable( Class<?>[] from, Class<?>[] to, int round )
-    {
-        if ( round != JAVA_VARARGS_ASSIGNABLE && from.length != to.length )
-            return false;
+    static boolean isSignatureAssignable( Object[] args, Class<?>[] from, Class<?>[] to, int round ) {
+        if ( from.length != to.length || args.length != from.length ) return false;
 
-        switch ( round )
-        {
-            case JAVA_BASE_ASSIGNABLE:
-                for( int i=0; i<from.length; i++ )
-                    if ( !isJavaBaseAssignable( to[i], from[i] ) )
-                        return false;
-                return true;
-            case JAVA_BOX_TYPES_ASSIGABLE:
-                for( int i=0; i<from.length; i++ )
-                    if ( !isJavaBoxTypesAssignable( to[i], from[i] ) )
-                        return false;
-                return true;
-            case JAVA_VARARGS_ASSIGNABLE:
+        for (int i = 0; i < from.length; i++)
+            if (!isAssignable(from[i], to[i], round) && !isBshLambdaAssignable(args[i], to[i], round))
                 return false;
-                // return isSignatureVarargsAssignable( from, to );
-            case BSH_ASSIGNABLE:
-                for( int i=0; i<from.length; i++ )
-                    if ( !isBshAssignable( to[i], from[i] ) )
-                        return false;
-                return true;
-            default:
-                throw new InterpreterError("bad case");
-        }
+        return true;
+    }
+
+    static boolean isSignatureAssignable( Class<?>[] from, Class<?>[] to, int round ) {
+        if ( from.length != to.length ) return false;
+
+        for (int i = 0; i < from.length; i++)
+            if (!isAssignable(from[i], to[i], round))
+                return false;
+        return true;
     }
 
     /**
@@ -246,36 +238,6 @@ class Types {
         return true;
     }
 
-    private static boolean isSignatureVarargsAssignable(
-        Class<?>[] from, Class<?>[] to )
-    {
-        if ( to.length == 0 || to.length > from.length + 1 )
-            return false;
-
-        int last = to.length - 1;
-        if ( to[last] == null || !to[last].isArray() )
-            return false;
-
-        if ( from.length == to.length
-                && from[last] != null
-                && from[last].isArray()
-                && !isJavaAssignable(to[last].getComponentType(),
-                        from[last].getComponentType()) )
-            return false;
-
-        if ( from.length >= to.length
-                && from[last] != null
-                && !from[last].isArray() )
-            for ( int i = last; i < from.length; i++ )
-                if ( !isJavaAssignable(to[last].getComponentType(), from[i]) )
-                    return false;
-
-        for ( int i = 0; i < last; i++ )
-            if ( !isJavaAssignable(to[i], from[i]) )
-                return false;
-
-        return true;
-    }
 
     /**
         Test if a conversion of the rhsType type to the lhsType type is legal via
@@ -399,6 +361,13 @@ class Types {
             // This should not happen with checkOnly true
             throw new InterpreterError("err in cast check: "+e, e);
         }
+    }
+
+    /** Returns if a specific values is a BshLambda an can be converted to 'functionalInterface' */
+    public static boolean isBshLambdaAssignable(Object value, Class<?> functionalInterface, int round) {
+        return Types.isFunctionalInterface(functionalInterface) &&
+                value instanceof BshLambda &&
+                ((BshLambda) value).isAssignable(functionalInterface, round);
     }
 
     /** Find array element type for class.
@@ -618,6 +587,10 @@ class Types {
                 toType, fromType, (Primitive)fromValue, checkOnly, operation );
         }
 
+        // Casting a BshLambda to a normal usable lambda
+        if (Types.isFunctionalInterface(toType) && fromValue instanceof BshLambda)
+            return checkOnly ? VALID_CAST : ((BshLambda) fromValue).convertTo(toType);
+
         // If type already assignable no cast necessary
         // We do this last to allow various errors above to be caught.
         // e.g cast Primitive.Void to Object would pass this
@@ -772,5 +745,10 @@ class Types {
         return Collection.class.isAssignableFrom(clas)
             || Map.class.isAssignableFrom(clas)
             || Entry.class.isAssignableFrom(clas);
+    }
+
+    /** Returns if a specific class is a functional interface */
+    public static boolean isFunctionalInterface(Class<?> clas) {
+        return clas != null && clas.isInterface() && clas.getAnnotation(FunctionalInterface.class) != null;
     }
 }

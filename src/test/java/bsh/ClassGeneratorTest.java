@@ -21,6 +21,9 @@
 package bsh;
 
 import static bsh.TestUtil.eval;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -28,10 +31,6 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.concurrent.Callable;
 import java.util.function.IntSupplier;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.instanceOf;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -194,13 +193,13 @@ public class ClassGeneratorTest {
         Capabilities.setAccessibility(current);
     }
 
-    private boolean var(Class<?> type, String var, String mod) throws UtilEvalError {
+    private boolean var(Class<?> type, String var, String mod) throws EvalError, UtilEvalError {
         Variable v = Reflect.getDeclaredVariable(type, var);
         return null != v && v.hasModifier(mod);
     }
 
-    private boolean meth(Class<?> type, String meth, String mod) throws UtilEvalError {
-        BshMethod m = Reflect.getDeclaredMethod(type, meth, new Class<?>[0]);
+    private boolean meth(Class<?> type, String meth, String mod) throws EvalError, UtilEvalError {
+        BshMethod m = Reflect.getDeclaredMethod(type, meth, new Object[0]);
         return null != m && m.hasModifier(mod);
     }
 

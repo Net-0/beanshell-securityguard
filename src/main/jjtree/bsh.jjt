@@ -947,6 +947,9 @@ void UnaryExpression() :
   (t = <INCR> | t = <DECR>) PrimaryExpression()
     { jjtThis.kind = t.kind; } #UnaryExpression(1)
 |
+  LOOKAHEAD(( FormalParameters() | <IDENTIFIER> ) "->")
+    LambdaExpression()
+|
   // cast
   LOOKAHEAD( CastLookahead() ) CastExpression()
 |
@@ -958,11 +961,14 @@ void UnaryExpression() :
 // This production only looks ahead to see if the next matches a cast.
 void CastLookahead() : { }
 {
-  LOOKAHEAD(2) <LPAREN> PrimitiveType()
+  LOOKAHEAD(3) <LPAREN> PrimitiveType() <RPAREN>
 |
-  LOOKAHEAD( <LPAREN> AmbiguousName() <LBRACKET> ) <LPAREN> AmbiguousName() <LBRACKET> <RBRACKET>
+  <LPAREN> PrimitiveType() <RPAREN>
 |
- <LPAREN> AmbiguousName() <RPAREN> ( <TILDE> | <BANG> | <LPAREN> | <IDENTIFIER> | <NEW> | Literal() | ArrayDimensions() )
+  LOOKAHEAD( <LPAREN> AmbiguousName() <LBRACKET> )
+    <LPAREN> AmbiguousName() <LBRACKET> <RBRACKET>
+|
+  <LPAREN> AmbiguousName() <RPAREN> ( <TILDE> | <BANG> | <LPAREN> | <IDENTIFIER> | <NEW> | Literal() | ArrayDimensions() )
 }
 
 void CastExpression() #CastExpression :
@@ -979,6 +985,16 @@ void PrimaryExpression() #PrimaryExpression : { }
 void MethodInvocation() #MethodInvocation : { }
 {
    AmbiguousName() Arguments()
+}
+
+void LambdaExpression() #LambdaExpression :
+{ Token t = null; }
+{
+  ( FormalParameters() | t=<IDENTIFIER> )
+  "->"
+  ( Block() | Expression() )
+  
+  { jjtThis.singleParamName = t != null ? t.image : null; }
 }
 
 void PrimaryPrefix() : { }
@@ -1018,6 +1034,16 @@ void PrimarySuffix() #PrimarySuffix :
       [ Expression() { jjtThis.hasRightIndex = true; } ]
      ( ":" { jjtThis.step = true; } [ Expression() ] )? )? "]" {
         jjtThis.operation = BSHPrimarySuffix.INDEX;
+    }
+|
+  // // TODO: verificar a POC de method ref para ver como ele fez sem um lazy-loading token!!
+  //t=<METHOD_REF> {
+  //    jjtThis.operation = BSHPrimarySuffix.METHODREF;
+  //    jjtThis.field = t.image.split("::")[1];
+  //  }
+  "::" (t=<IDENTIFIER> | t="new") {
+      jjtThis.operation = BSHPrimarySuffix.METHODREF;
+      jjtThis.field = t.image;
     }
 |
     // Safe navigate field access or method invocation
@@ -1105,6 +1131,7 @@ void Literal() #Literal :
 |
   x = <LONG_STRING_LITERAL> {
         try {
+            // TODO: aqui n deveria ser jjtThis.stringSetup() ??
             jjtThis.value = x.image.substring(3, x.image.length() - 3);
         } catch ( Exception e ) {
             throw createParseException("Error parsing long string: "+x.image, e);
@@ -1119,7 +1146,8 @@ void Literal() #Literal :
 }
 |
  VoidLiteral() {
-    jjtThis.value = Primitive.VOID; }
+    jjtThis.value = Primitive.VOID;
+  }
 }
 
 boolean BooleanLiteral() :

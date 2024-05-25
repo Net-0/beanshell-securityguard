@@ -27,7 +27,7 @@ package bsh;
 
 import java.io.Serializable;
 
-public class Variable implements Serializable, BshClassManager.Listener
+public class Variable implements Serializable, BshClassManager.Listener, Cloneable
 {
     public static final int DECLARATION=0, ASSIGNMENT=1;
     /** A null type means an untyped variable */
@@ -126,6 +126,15 @@ public class Variable implements Serializable, BshClassManager.Listener
         object field.
     */
     Object getValue() throws UtilEvalError {
+        // if (name.equals("i")) {
+        //     System.out.println("--------------------------------------");
+        //     System.out.println("Variable.getValue() -> this: " + super.toString());
+        //     System.out.println("Variable.getValue() -> name: " + name);
+        //     System.out.println("Variable.getValue() -> value: " + value);
+        //     System.out.println("Variable.getValue() -> lhs: " + lhs);
+        //     new Exception().printStackTrace();
+        //     System.out.println("--------------------------------------");
+        // }
         if ( lhs != null )
             return type == null ?
                 lhs.getValue() : Primitive.wrap( lhs.getValue(), type );
@@ -176,5 +185,25 @@ public class Variable implements Serializable, BshClassManager.Listener
         if (Reflect.isGeneratedClass(type)) try {
             type = Reflect.getThisNS(type).getClass(type.getName());
         } catch (UtilEvalError e) { /** should not happen on reload */ }
+    }
+
+    @Override
+    protected Variable clone() {
+        try {
+            // if (name.equals("i")) {
+            //     System.out.println("--------------------------------------");
+            //     System.out.println("Variable.clone() -> this: " + super.toString());
+            //     System.out.println("Variable.clone() -> name: " + name);
+            //     System.out.println("Variable.clone() -> value: " + value);
+            //     System.out.println("Variable.clone() -> lhs: " + lhs);
+            //     // new Exception().printStackTrace();
+            //     System.out.println("--------------------------------------");
+            // }
+            Variable clone = (Variable) super.clone();
+            clone.modifiers = clone.modifiers != null ? clone.modifiers.clone() : null;
+            return clone;
+        } catch (CloneNotSupportedException e) {
+            throw new IllegalArgumentException(e.getMessage(), e);
+        }
     }
 }

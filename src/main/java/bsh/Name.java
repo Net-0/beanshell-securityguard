@@ -825,7 +825,7 @@ class Name implements java.io.Serializable
             if ( obj.getClass().isEnum() ) {
                 NameSpace thisNamespace = Reflect.getThisNS(obj);
                 if ( null != thisNamespace ) {
-                    BshMethod m = thisNamespace.getMethod(methodName, Types.getTypes(args), true);
+                    BshMethod m = thisNamespace.getMethod(methodName, args, true);
                     if ( null != m )
                         return m.invoke(args, interpreter, callstack, callerInfo);
                 }
@@ -870,12 +870,11 @@ class Name implements java.io.Serializable
                 "invokeLocalMethod: interpreter = null");
 
         String methodName = value;
-        Class<?>[] argTypes = Types.getTypes( args );
 
         // Check for existing method
         BshMethod meth = null;
         try {
-            meth = namespace.getMethod( methodName, argTypes );
+            meth = namespace.getMethod( methodName, args );
         } catch ( UtilEvalError e ) {
             throw e.toEvalError(
                 "Local method invocation", callerInfo, callstack );
