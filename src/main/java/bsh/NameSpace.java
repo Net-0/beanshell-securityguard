@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 
 /** A namespace in which methods, variables, and imports (class names) live.
  * This is package public because it is used in the implementation of some bsh
@@ -127,6 +128,7 @@ public class NameSpace
         this.importObject(instance);
     }
 
+    // TODO: remove it ? The method should be just in bsh.This ?
     /** Gets the class instance.
      * @return the class instance
      * @throws UtilEvalError the util eval error */
@@ -1010,8 +1012,22 @@ public class NameSpace
      * @throws UtilEvalError the util eval error */
     public Class<?> getClass(final String name) throws UtilEvalError {
         final Class<?> c = this.getClassImpl(name);
-        if (c != null)
-            return c;
+        if (c != null) return c;
+
+        // Resolve static inner classes
+        String[] parts = name.split("\\.");
+        StringBuilder baseClassNameSB = new StringBuilder(parts[0]);
+        for (int i = 1; i < parts.length; i++) {
+            baseClassNameSB.append(".").append(parts[i]);
+            Class<?> baseClass = this.getClassImpl(baseClassNameSB.toString());
+            if (baseClass == null) continue;
+
+            StringBuilder classNameSB = new StringBuilder(baseClass.getName());
+            for (; i < parts.length; i++) classNameSB.append("$").append(parts[i]);
+            Class<?> _class = this.classForName(classNameSB.toString());
+            if (_class != null) return _class;
+        }
+
         if (this.parent != null)
             return this.parent.getClass(name);
         return null;
@@ -1550,7 +1566,6 @@ public class NameSpace
         }
     }
 
-
     NameSpace copy() {
         try {
             final NameSpace clone = (NameSpace) clone();
@@ -1585,4 +1600,37 @@ public class NameSpace
         return new ArrayList<T>(list);
     }
 
+    /** Returns a new {@link NameSpace} to be used by lambda expressions; an {@link NameSpace} where all inherited variables are final, as they're in standard Java */
+    protected NameSpace toLambdaNameSpace() {
+        NameSpace lambdaNS = this.copy();
+        Stack<NameSpace> parents = new Stack<>();
+        for (NameSpace ns = this.parent; ns != null; ns = ns.parent) parents.add(ns);
+        while (!parents.isEmpty()) { // Add all variables from the most far parent to 'this.parent'
+            NameSpace parent = parents.pop();
+            if (parent.isClass || parent.isEnum) continue;
+            lambdaNS.variables.putAll(parent.variables);
+        }
+
+        // Change all variables to be final
+        lambdaNS.variables.replaceAll((k, v) -> {
+            Variable clone = v.clone();
+            clone.modifiers.addModifier("final");
+            return clone;
+        });
+        return lambdaNS;
+    }
+
+    /** @return the enclosing class body namespace or null if not in a class. */
+    NameSpace getClassNameSpace() {
+        if ( this.isClass ) return this; // is a class instance
+
+        // is a method parent is a class
+        if ( this.isMethod && this.parent != null && this.parent.isClass ) return this.parent;
+
+        return null;
+    }
+
+    PackageIdentifier getPackageIdentifier(String packageName) {
+        return new PackageIdentifier(this.getClassManager(), packageName);
+    }
 }

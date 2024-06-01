@@ -88,19 +88,20 @@ class BSHPrimaryExpression extends SimpleNode
         opportunity to work through them.  This lets the suffixes decide
         how to interpret an ambiguous name (e.g. for the .class operation).
     */
-    private Object eval( boolean toLHS,
-        CallStack callstack, Interpreter interpreter)
-        throws EvalError
-    {
+    private Object eval( boolean toLHS, CallStack callstack, Interpreter interpreter) throws EvalError {
         // We can cache array expressions evaluated during type inference
         if ( isArrayExpression && null != cached )
             return cached;
 
-        Object obj = jjtGetChild(0);
+        Node[] children = this.jjtGetChildren();
+        Object obj = children[0];
+        for (int i = 1; i < children.length; i++) {
+            BSHPrimarySuffix primarySuffix = (BSHPrimarySuffix) jjtGetChild(i);
+            if (primarySuffix.operation == BSHPrimarySuffix.METHOD_REF && i != (children.length-1))
+                throw new EvalError("Method Reference must be the last suffix!", primarySuffix, callstack);
 
-        for( int i=1; i < jjtGetNumChildren(); i++ )
-            obj = ((BSHPrimarySuffix) jjtGetChild(i)).doSuffix(
-                obj, toLHS, callstack, interpreter);
+            obj = primarySuffix.doSuffix(obj, toLHS, callstack, interpreter);
+        }
 
         /*
             If the result is a Node eval() it to an object or LHS
@@ -135,6 +136,33 @@ class BSHPrimaryExpression extends SimpleNode
         if ( isArrayExpression )
             cached = obj;
         return obj;
+    }
+
+    @Override
+    public Class<?> getEvalReturnType(NameSpace nameSpace) throws EvalError {
+        try {
+            Node[] children = this.jjtGetChildren();
+            if (children.length == 1) return children[0].getEvalReturnType(nameSpace);
+
+            Object obj = children[0] instanceof BSHAmbiguousName
+                            ? ((BSHAmbiguousName) children[0]).getName(nameSpace)
+                            : children[0] instanceof BSHType
+                                ? ((BSHType) children[0]).getClassIdentifier(nameSpace)
+                                : children[0].getEvalReturnType(nameSpace);
+
+            for (int i = 1; i < children.length; i++) {
+                BSHPrimarySuffix primarySuffix = (BSHPrimarySuffix) children[i];
+                if (primarySuffix.operation == BSHPrimarySuffix.METHOD_REF && i != (children.length-1))
+                    throw new EvalError("Method Reference must be the last suffix!", primarySuffix, null);
+                obj = primarySuffix.doReturnType(obj, nameSpace);
+            }
+
+            if (obj instanceof Class<?>) return (Class<?>) obj;
+
+            throw new EvalError("Invalid expression", this, null);
+        } catch (UtilEvalError e) {
+            throw e.toEvalError(this, null);
+        }
     }
 }
 

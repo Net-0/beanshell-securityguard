@@ -45,7 +45,8 @@ class BSHMethodDeclaration extends SimpleNode
 
     // Unsafe caching of type here.
     Class<?> returnType;  // null (none), Void.TYPE, or a Class
-    int numThrows = 0;
+    String[] throwsNames;
+    // int numThrows = 0;
     boolean isVarArgs;
     private boolean isScriptedObject;
 
@@ -158,6 +159,9 @@ class BSHMethodDeclaration extends SimpleNode
         for(int i=firstThrowsClause; i<numThrows+firstThrowsClause; i++)
             ((BSHAmbiguousName)jjtGetChild(i)).toClass(
                 callstack, interpreter );
+
+        for (int i = 0; i < this.throwsNames.length; i++)
+            
 
         paramsNode.eval( callstack, interpreter );
 

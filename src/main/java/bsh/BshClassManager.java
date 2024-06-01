@@ -26,6 +26,12 @@
 
 package bsh;
 
+import static bsh.Capabilities.haveAccessibility;
+import static bsh.Reflect.isPackageAccessible;
+import static bsh.Reflect.isPackageScope;
+import static bsh.Reflect.isPrivate;
+import static bsh.Reflect.isPublic;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
@@ -41,13 +47,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import bsh.util.ReferenceCache;
-
-import static bsh.Reflect.isPublic;
-import static bsh.util.ReferenceCache.Type;
-import static bsh.Reflect.isPrivate;
-import static bsh.Reflect.isPackageAccessible;
-import static bsh.Reflect.isPackageScope;
-import static bsh.Capabilities.haveAccessibility;
+import bsh.util.ReferenceCache.Type;
 
 /**
     BshClassManager manages all classloading in BeanShell.
@@ -98,10 +98,8 @@ public class BshClassManager {
 
     /** Class member cached value instance **/
     static final class MemberCache {
-        private final Map<String,List<Invocable>> cache
-                            = new ConcurrentHashMap<>();
-        private final Map<String,Invocable> fields
-                            = new ConcurrentHashMap<>();
+        private final Map<String,List<Invocable>> cache = new ConcurrentHashMap<>();
+        private final Map<String,Invocable> fields = new ConcurrentHashMap<>();
 
         /** Constructor iterates through interfaces and super classes
          * collect and cache field, constructor and method members.
@@ -395,6 +393,10 @@ public class BshClassManager {
             clas = loadSourceClass( name );
 
         return clas;
+    }
+
+    public List<String> getPackages() {
+        throw new RuntimeException(cmUnavailable());
     }
 
     // Move me to classpath/ClassManagerImpl???

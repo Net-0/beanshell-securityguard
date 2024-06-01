@@ -327,4 +327,34 @@ class BSHAllocationExpression extends SimpleNode
                 Arrays.fill((Object[]) arr, Primitive.unwrap(
                     Primitive.getDefaultValue(comp)));
     }
+
+    @Override
+    public Class<?> getEvalReturnType(NameSpace nameSpace) throws EvalError {
+        // // loose typed array initializer ex. new {1, 2, 3};
+        // if ( jjtGetNumChildren() == 1 && jjtGetChild(0)
+        //         instanceof BSHArrayDimensions )
+        //         return arrayAllocation( (BSHArrayDimensions) jjtGetChild(0),
+        //                Void.TYPE, callstack, interpreter );
+
+        Node first = jjtGetChild(0); // type is either a class name or a primitive type
+        Node second = jjtGetChild(1); // args is either constructor arguments or array dimensions
+
+        if ( first instanceof BSHAmbiguousName ) {
+            BSHAmbiguousName name = (BSHAmbiguousName) first;
+            Object obj = name.toObject(new CallStack(nameSpace), null, true );
+            Class<?> clazz = ((ClassIdentifier) obj).clas;
+
+            // It's a constructor, just return the class type
+            if (second instanceof BSHArguments) return clazz;
+
+            // It's an array, return an array type
+            BSHArrayDimensions arrayDimensions = (BSHArrayDimensions) second;
+            return Array.newInstance(clazz, new int[arrayDimensions.numUndefinedDims]).getClass();
+        }
+        // else
+        //     return primitiveArrayAllocation((BSHPrimitiveType)type,
+        //         (BSHArrayDimensions)args, callstack, interpreter );
+
+        return super.getEvalReturnType(nameSpace);
+    }
 }

@@ -109,5 +109,6 @@ public interface Node extends ListIterator<Node> {
     /** Return the node type ID. */
     int getId();
 
+    Class<?> getEvalReturnType(NameSpace nameSpace) throws EvalError;
 }
 /* JavaCC - OriginalChecksum=5b1698226c0eeee61d542c86c4e8e60c (do not edit this line) */

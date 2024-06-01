@@ -64,5 +64,13 @@ class BSHArguments extends SimpleNode
 
         return args;
     }
+
+    public Class<?>[] getArgumentsType(NameSpace nameSpace) throws EvalError {
+        Node[] children = this.jjtGetChildren();
+        Class<?>[] types = new Class<?>[children.length];
+        for(int i = 0; i < types.length; i++)
+            types[i] = children[i].getEvalReturnType(nameSpace);
+        return types;
+    }
 }
 

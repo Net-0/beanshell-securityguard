@@ -407,6 +407,8 @@ TOKEN : /* LITERALS */
 
 TOKEN : /* IDENTIFIERS */
 {
+  < COMPLEX_IDENTIFIER: <IDENTIFIER> ("." <IDENTIFIER>)* >
+|
   < IDENTIFIER: <LETTER> (<LETTER>|<DIGIT>)* >
 |
   < #LETTER:
@@ -591,26 +593,26 @@ void ClassDeclaration() #ClassDeclaration :
 {
     Modifiers mods;
     Token name;
-    int numInterfaces;
+    String[] interfacesNames = new String[0];
+    Token st;
 }
 {
     mods = Modifiers( Modifiers.CLASS, false )
   (
     (
-        "class" { jjtThis.type = ClassGenerator.Type.CLASS; } name=<IDENTIFIER>
-        [ "extends" AmbiguousName() { jjtThis.extend = true; } ]
-        [ "implements" numInterfaces=NameList()
-        { jjtThis.numInterfaces=numInterfaces; } ]
+        "class" { jjtThis.type = ClassGenerator.Type.CLASS; }
+        name=<IDENTIFIER>
+        [ "extends" st=<COMPLEX_IDENTIFIER> { jjtThis.superClassName = st.image; } ]
+        [ "implements" interfacesNames=_NameList() { jjtThis.interfacesNames=interfacesNames; } ]
       |
-        "interface" { jjtThis.type = ClassGenerator.Type.INTERFACE; } name=<IDENTIFIER>
-        [ "extends" numInterfaces=NameList()
-            { jjtThis.numInterfaces=numInterfaces; } ]
+        "interface" { jjtThis.type = ClassGenerator.Type.INTERFACE; }
+        name=<IDENTIFIER>
+        [ "extends" interfacesNames=_NameList() { jjtThis.interfacesNames=interfacesNames; } ]
     )
     Block()
   |
     "enum" { jjtThis.type = ClassGenerator.Type.ENUM; } name=<IDENTIFIER>
-    [ "implements" numInterfaces=NameList()
-    { jjtThis.numInterfaces=numInterfaces; } ]
+    [ "implements" interfacesNames=_NameList() { jjtThis.interfacesNames=interfacesNames; } ]
     EnumBlock()
   )
     {
@@ -643,6 +645,7 @@ void MethodDeclaration() #MethodDeclaration :
     Token t = null;
     Modifiers mods;
     int count;
+    String[] throwsNames;
 }
 {
     mods = Modifiers( Modifiers.METHOD, false ) { if (null != mods) jjtThis.modifiers = mods; }
@@ -659,17 +662,19 @@ void MethodDeclaration() #MethodDeclaration :
 }
 
 void PackageDeclaration () #PackageDeclaration:
-{ }
+{ Token t; }
 {
-    "package" AmbiguousName()
+    "package" t=<COMPLEX_IDENTIFIER>
+    { jjtThis.packageName = t.image; }
 }
 
 void ImportDeclaration() #ImportDeclaration :
-{ }
+{ Token t; }
 {
   LOOKAHEAD( 3 )
   "import" [ "static" { jjtThis.staticImport = true; } ]
-  AmbiguousName() [ "." "*" { jjtThis.importPackage = true; } ] ";"
+  t=<COMPLEX_IDENTIFIER> [ "." "*" { jjtThis.importPackage = true; } ] ";"
+  { jjtThis.name = t.image; }
 |
    // bsh super import statement
   "import" "*" ";" { jjtThis.superImport = true; }
@@ -727,8 +732,19 @@ void FormalParameter() #FormalParameter :
     Type, name and expression syntax follows.
 */
 void Type() #Type :
-{ }
+{ Token t; }
 {
+  (
+      "boolean" { jjtThis.primitiveType = Boolean.TYPE; }
+    | "char" { jjtThis.primitiveType =  Character.TYPE; }
+    | "byte" { jjtThis.primitiveType =  Byte.TYPE; }
+    | "short" { jjtThis.primitiveType =  Short.TYPE; }
+    | "int" { jjtThis.primitiveType =  Integer.TYPE; }
+    | "long" { jjtThis.primitiveType =  Long.TYPE; }
+    | "float" { jjtThis.primitiveType =  Float.TYPE; }
+    | "double" { jjtThis.primitiveType =  Double.TYPE; }
+    | t=<COMPLEX_IDENTIFIER> { jjtThis.className = t.image; }
+  )
     /*
         The embedded lookahead is (was?) necessary to disambiguate for
         PrimaryPrefix.  ( )* is a choice point.  It took me a while to
@@ -777,6 +793,26 @@ void AmbiguousName() #AmbiguousName :
   ( LOOKAHEAD(2) "." t = <IDENTIFIER> { s.append("."+t.image); } )* {
     jjtThis.text = s.toString();
   }
+}
+
+void Name() #Name :
+{
+  Token t;
+}
+{
+  t = <IDENTIFIER> { jjtThis.name = t.image; }
+}
+
+// TODO: fix this name!
+String[] _NameList() :
+{
+  List<String> names = new ArrayList<>();
+  Token t;
+}
+{
+  t=<COMPLEX_IDENTIFIER> { names.add(t.image); }
+  ( "," t=<COMPLEX_IDENTIFIER> { names.add(t.image); } )
+  { return names.toArray(new String[0]); }
 }
 
 int NameList() :
@@ -947,6 +983,9 @@ void UnaryExpression() :
   (t = <INCR> | t = <DECR>) PrimaryExpression()
     { jjtThis.kind = t.kind; } #UnaryExpression(1)
 |
+  LOOKAHEAD(( FormalParameters() | <IDENTIFIER> ) "->")
+    LambdaExpression()
+|
   // cast
   LOOKAHEAD( CastLookahead() ) CastExpression()
 |
@@ -958,11 +997,15 @@ void UnaryExpression() :
 // This production only looks ahead to see if the next matches a cast.
 void CastLookahead() : { }
 {
-  LOOKAHEAD(2) <LPAREN> PrimitiveType()
+  // TODO: see it!
+  LOOKAHEAD(3) <LPAREN> PrimitiveType() <RPAREN>
 |
-  LOOKAHEAD( <LPAREN> AmbiguousName() <LBRACKET> ) <LPAREN> AmbiguousName() <LBRACKET> <RBRACKET>
+  <LPAREN> PrimitiveType() <RPAREN>
 |
- <LPAREN> AmbiguousName() <RPAREN> ( <TILDE> | <BANG> | <LPAREN> | <IDENTIFIER> | <NEW> | Literal() | ArrayDimensions() )
+  LOOKAHEAD( <LPAREN> AmbiguousName() <LBRACKET> )
+    <LPAREN> AmbiguousName() <LBRACKET> <RBRACKET>
+|
+  <LPAREN> AmbiguousName() <RPAREN> ( <TILDE> | <BANG> | <LPAREN> | <IDENTIFIER> | <NEW> | Literal() | ArrayDimensions() )
 }
 
 void CastExpression() #CastExpression :
@@ -976,9 +1019,21 @@ void PrimaryExpression() #PrimaryExpression : { }
   PrimaryPrefix() ( PrimarySuffix() )*
 }
 
-void MethodInvocation() #MethodInvocation : { }
+void MethodInvocation() #MethodInvocation :
+{ Token t = null; }
 {
-   AmbiguousName() Arguments()
+  t=<IDENTIFIER> Arguments()
+  { jjtThis.methodName = t.image; }
+}
+
+void LambdaExpression() #LambdaExpression :
+{ Token t = null; }
+{
+  ( FormalParameters() | t=<IDENTIFIER> )
+  "->"
+  ( Block() | Expression() )
+  
+  { jjtThis.singleParamName = t != null ? t.image : null; }
 }
 
 void PrimaryPrefix() : { }
@@ -989,13 +1044,13 @@ void PrimaryPrefix() : { }
 |
   AllocationExpression()
 |
-  LOOKAHEAD( AmbiguousName() "(" ( Expression() | ")" ) )
+  LOOKAHEAD( <IDENTIFIER> "(" )
     MethodInvocation()
 |
   LOOKAHEAD( Type() "." "class" )
     Type()
 |
-  AmbiguousName()
+  Name()
 
 /*
 |
@@ -1018,6 +1073,11 @@ void PrimarySuffix() #PrimarySuffix :
       [ Expression() { jjtThis.hasRightIndex = true; } ]
      ( ":" { jjtThis.step = true; } [ Expression() ] )? )? "]" {
         jjtThis.operation = BSHPrimarySuffix.INDEX;
+    }
+|
+  "::" (t=<IDENTIFIER> | t="new") {
+      jjtThis.operation = BSHPrimarySuffix.METHOD_REF;
+      jjtThis.field = t.image;
     }
 |
     // Safe navigate field access or method invocation
@@ -1105,6 +1165,7 @@ void Literal() #Literal :
 |
   x = <LONG_STRING_LITERAL> {
         try {
+            // TODO: aqui n deveria ser jjtThis.stringSetup() ??
             jjtThis.value = x.image.substring(3, x.image.length() - 3);
         } catch ( Exception e ) {
             throw createParseException("Error parsing long string: "+x.image, e);
@@ -1119,7 +1180,8 @@ void Literal() #Literal :
 }
 |
  VoidLiteral() {
-    jjtThis.value = Primitive.VOID; }
+    jjtThis.value = Primitive.VOID;
+  }
 }
 
 boolean BooleanLiteral() :

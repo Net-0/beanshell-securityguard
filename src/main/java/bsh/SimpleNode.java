@@ -191,6 +191,15 @@ class SimpleNode implements Node, Serializable {
         }
     }
 
+    public void dumpClasses(String prefix) {
+        System.out.println(prefix + this.getClass().getName());
+        if (children != null) for (int i = 0; i < children.length; ++i) {
+            SimpleNode n = (SimpleNode) children[i];
+            if (n != null)
+                n.dumpClasses(prefix + " ");
+        }
+    }
+
     /** {@inheritDoc} */
     @Override
     public Object eval(CallStack callstack, Interpreter interpreter)
@@ -243,5 +252,11 @@ class SimpleNode implements Node, Serializable {
     /** {@inheritDoc} */
     @Override
     public int getId() { return this.id; }
+
+    /** {@inheritDoc} */
+    @Override
+    public Class<?> getEvalReturnType(NameSpace nameSpace) throws EvalError {
+        throw new EvalError(this.getClass().getName() + " doesn't implements 'getEvalReturnType'", this, null);
+    }
 }
 

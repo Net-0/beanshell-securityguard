@@ -31,6 +31,7 @@ package bsh;
 import java.lang.reflect.Array;
 
 class BSHType extends SimpleNode implements BshClassManager.Listener {
+
     private static final long serialVersionUID = 1L;
     /**
         baseType is used during evaluation of full type and retained for the
@@ -44,31 +45,24 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
     */
     private int arrayDims;
 
-    /**
-        Internal cache of the type.  Cleared on classloader change.
-    */
+    /** Internal cache of the type.  Cleared on classloader change. */
     private Class<?> type;
 
     /** Flag to track if instance is already a listener */
     private boolean isListener = false;
 
+    Class<?> primitiveType;
     String descriptor;
 
-    BSHType(int id) {
-        super(id);
-    }
+    BSHType(int id) { super(id); }
 
     /**
         Used by the grammar to indicate dimensions of array types
         during parsing.
     */
-    public void addArrayDimension() {
-        arrayDims++;
-    }
+    public void addArrayDimension() { arrayDims++; }
 
-    Node getTypeNode() {
-        return jjtGetChild(0);
-    }
+    Node getTypeNode() { return jjtGetChild(0); }
 
     /**
          Returns a class descriptor for this type.
@@ -123,12 +117,9 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
         return descriptor;
     }
 
-    public Class<?> getType( CallStack callstack, Interpreter interpreter )
-        throws EvalError
-    {
+    public Class<?> getType( CallStack callstack, Interpreter interpreter ) throws EvalError {
         // return cached type if available
-        if ( type != null )
-            return type;
+        if (this.type != null ) return this.type;
 
         //  first node will either be PrimitiveType or AmbiguousName
         Node node = getTypeNode();
@@ -177,6 +168,10 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
         In the case where we are not an array this will be the same as type.
     */
     public Class<?> getBaseType() {
+        if (this.baseType != null) return this.baseType;
+
+        
+
         return baseType;
     }
     /**
@@ -211,5 +206,12 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
             return name;
         else
             return "L"+ name.replace('.','/') +";";
+    }
+
+    public ClassIdentifier getClassIdentifier(NameSpace nameSpace) throws EvalError {
+        CallStack callStack = new CallStack(nameSpace);
+        Interpreter interpreter = new Interpreter(nameSpace);
+        Class<?> clazz = this.getType(callStack, interpreter);
+        return new ClassIdentifier(clazz);
     }
 }

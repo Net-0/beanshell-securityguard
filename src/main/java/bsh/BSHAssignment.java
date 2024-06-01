@@ -36,6 +36,8 @@ class BSHAssignment extends SimpleNode implements ParserConstants {
 
     public Object eval(CallStack callstack, Interpreter interpreter)
             throws EvalError {
+        // this.dumpClasses("");
+
         if ( null == operator ) try {
             return jjtGetChild(0).eval(callstack, interpreter);
         } catch (SafeNavigate aborted) {
@@ -178,5 +180,14 @@ class BSHAssignment extends SimpleNode implements ParserConstants {
     @Override
     public String toString() {
         return super.toString() + (null == operator ? "" : ": " + tokenImage[operator]);
+    }
+
+    @Override
+    public Class<?> getEvalReturnType(NameSpace nameSpace) throws EvalError {
+        Node[] children = this.jjtGetChildren();
+        if ( null == operator ) {
+            return children[0].getEvalReturnType(nameSpace);
+        }
+        return super.getEvalReturnType(nameSpace);
     }
 }

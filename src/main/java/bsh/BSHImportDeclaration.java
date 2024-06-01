@@ -28,74 +28,92 @@
 
 package bsh;
 
-class BSHImportDeclaration extends SimpleNode
-{
+class BSHImportDeclaration extends SimpleNode {
     private static final long serialVersionUID = 1L;
-    public boolean importPackage;
-    public boolean staticImport;
-    public boolean superImport;
+    String name;
+    boolean importPackage;
+    boolean staticImport;
+    boolean superImport;
 
     BSHImportDeclaration(int id) { super(id); }
 
-    public Object eval(CallStack callstack, Interpreter interpreter)
-        throws EvalError
-    {
-        NameSpace namespace = callstack.top();
-        if ( superImport ) try {
-            namespace.doSuperImport();
-        } catch ( UtilEvalError e ) {
-            throw e.toEvalError( this, callstack  );
-        }
-        else {
-            BSHAmbiguousName ambigName = (BSHAmbiguousName) jjtGetChild(0);
+    @Override
+    public Object eval(CallStack callStack, Interpreter interpreter) throws EvalError {
+        try {
+            NameSpace nameSpace = callStack.top();
+
+            // e.g.: import *;
+            if (superImport) {
+                nameSpace.doSuperImport();
+                return Primitive.VOID;
+            }
+
             if ( staticImport ) {
                 if ( importPackage ) {
-                    // import all (*) static members
-                    Class<?> clas = ambigName.toClass( callstack, interpreter );
-                    namespace.importStatic( clas );
-                } else {
-                    Object obj = null;
-                    Class<?> clas = null;
-                    String name = Name.suffix(ambigName.text, 1);
-                    try { // import static method from class
-                        clas = namespace.getClass(Name.prefix(ambigName.text));
-                        obj = Reflect.staticMethodImport(clas, name);
-                    } catch (Exception e) { e.printStackTrace(); /* ignore try field instead */ }
-                    try { // import static field from class
-                        if (null != clas && null == obj)
-                            obj = Reflect.getLHSStaticField(clas, name);
-                    } catch (Exception e) { /* ignore try method instead */ }
-                    try { // import static method from Name
-                        if (null == obj)
-                            obj = ambigName.toObject( callstack, interpreter );
-                    } catch (Exception e) { /* ignore try field instead */ }
-                    // do we have a method
-                    if ( obj instanceof BshMethod ) {
-                        namespace.setMethod( (BshMethod) obj );
-                        return Primitive.VOID;
-                    }
-                    if ( !(obj instanceof LHS) )
-                        // import static field from Name
-                        obj = ambigName.toLHS( callstack, interpreter );
-                    // do we have a field
-                    if ( obj instanceof LHS && ((LHS) obj).isStatic() ) {
-                        namespace.setVariableImpl( ((LHS) obj).getVariable() );
-                        return Primitive.VOID;
-                    }
-                    // no static member found
-                    throw new EvalError(ambigName.text
-                                        + " is not a static member of a class",
-                                        this, callstack );
+                    // e.g.: import static java.util.stream.Collectors.*;
+                    Class<?> clas = nameSpace.getClass(this.name);
+                    nameSpace.importStatic(clas);
+                    return Primitive.VOID;
                 }
-            } else { // import package
-                String name = ambigName.text;
-                if ( importPackage )
-                    namespace.importPackage(name);
-                else
-                    namespace.importClass(name);
+
+                // e.g.: import static java.util.stream.Collectors.toList;
+                this.importStaticMember(nameSpace, callStack);
+                return Primitive.VOID;
             }
+
+            if ( importPackage ) nameSpace.importPackage(this.name); // e.g.: import java.util.*;
+            else nameSpace.importClass(this.name); // e.g.: import java.util.ArrayList;
+
+            return Primitive.VOID;
+        } catch ( UtilEvalError e ) {
+            throw e.toEvalError(this, callStack);
         }
-        return Primitive.VOID;
+    }
+
+    private void importStaticMember(NameSpace nameSpace, CallStack callStack) {
+        Object obj = null;
+        Class<?> clas = null;
+        final int lastDot = this.name.lastIndexOf('.');
+        final String className = this.name.substring(0, lastDot);
+        final String memberName = this.name.substring(lastDot+1);
+
+        try { // import static method from class
+            clas = nameSpace.getClass(className);
+            obj = Reflect.staticMethodImport(clas, memberName);
+        } catch (Exception e) {}
+
+        try { // import static field from class
+            if (null != clas && null == obj)
+                obj = Reflect.getLHSStaticField(clas, memberName);
+        } catch (Exception e) {}
+
+        // TODO: see it?
+        // try { // import static method from Name
+        //     if (null == obj)
+        //         obj = ambigName.toObject( callStack, interpreter );
+        // } catch (Exception e) { /* ignore try field instead */ }
+
+        // TODO: see it
+        // do we have a method
+        if (obj instanceof BshMethod) {
+            nameSpace.setMethod((BshMethod) obj);
+            return;
+        }
+
+        // TODO: see it?
+        // if ( !(obj instanceof LHS) )
+        //     // import static field from Name
+        //     obj = ambigName.toLHS( callStack, interpreter );
+
+        // TODO: see it
+        // do we have a field
+        if ( obj instanceof LHS && ((LHS) obj).isStatic() ) {
+            nameSpace.setVariableImpl( ((LHS) obj).getVariable() );
+            return;
+        }
+
+        // no static member found
+        throw new EvalError(this.name + " is not a static member of a class", this, callStack );
     }
 
     @Override
