@@ -95,5 +95,13 @@ class BSHAmbiguousName extends SimpleNode
     public String toString() {
         return super.toString() + ": " + text;
     }
+
+    @Override
+    public Class<?> getEvalReturnType(NameSpace nameSpace) throws EvalError {
+        CallStack callStack = new CallStack(nameSpace);
+        Interpreter interpreter = new Interpreter(nameSpace);
+        Object obj = this.toObject(callStack, interpreter);
+        return Types.getType(obj);
+    }
 }
 

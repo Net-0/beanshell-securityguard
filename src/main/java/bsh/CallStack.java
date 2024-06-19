@@ -81,7 +81,8 @@ public final class CallStack implements Serializable {
         int size = stack.size();
         if ( depth >= size )
             return NameSpace.JAVACODE;
-        return stack.toArray(new NameSpace[size])[size-1-depth];
+        // return stack.toArray(new NameSpace[size])[size-1-depth];
+        return stack.get(size-1-depth);
     }
 
     /**

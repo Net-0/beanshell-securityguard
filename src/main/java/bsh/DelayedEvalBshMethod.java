@@ -27,12 +27,14 @@
 
 package bsh;
 
+import bsh.org.objectweb.asm.Type;
+
 public class DelayedEvalBshMethod extends BshMethod
 {
     private static final long serialVersionUID = 1L;
     String returnTypeDescriptor;
     BSHReturnType returnTypeNode;
-    String [] paramTypeDescriptors;
+    String[] paramTypeDescriptors;
     BSHFormalParameters paramTypesNode;
 
     // used for the delayed evaluation...
@@ -59,8 +61,8 @@ public class DelayedEvalBshMethod extends BshMethod
     DelayedEvalBshMethod(
         String name,
         String returnTypeDescriptor, BSHReturnType returnTypeNode,
-        String [] paramNames,
-        String [] paramTypeDescriptors, BSHFormalParameters paramTypesNode,
+        String[] paramNames,
+        String[] paramTypeDescriptors, BSHFormalParameters paramTypesNode,
         BSHBlock methodBody,
         NameSpace declaringNameSpace, Modifiers modifiers,
         boolean isVarArgs,
@@ -71,7 +73,7 @@ public class DelayedEvalBshMethod extends BshMethod
 
         this.returnTypeDescriptor = returnTypeDescriptor;
         this.returnTypeNode = returnTypeNode;
-        this.paramTypeDescriptors = paramTypeDescriptors;
+        this.paramTypeDescriptors = paramTypeDescriptors; // TODO: remove it
         this.paramTypesNode = paramTypesNode;
         this.callstack = callstack;
         this.interpreter = interpreter;
@@ -111,7 +113,13 @@ public class DelayedEvalBshMethod extends BshMethod
         }
     }
 
-    public String [] getParamTypeDescriptors() { return paramTypeDescriptors; }
+    public String[] getParamTypeDescriptors() {
+        Class<?>[] paramTypes = this.getParameterTypes();
+        String[] paramTypeDecriptors = new String[paramTypes.length];
+        for (int i = 0; i < paramTypes.length; i++)
+            paramTypeDecriptors[i] = Type.getDescriptor(paramTypes[i]);
+        return paramTypeDescriptors;
+    }
 
     public Class<?>[] getParameterTypes()
     {
@@ -119,7 +127,7 @@ public class DelayedEvalBshMethod extends BshMethod
             return this.constructor.getParameterTypes();
         // BSHFormalParameters will cache the type for us
         try {
-            return (Class [])paramTypesNode.eval( callstack, interpreter );
+            return (Class[])paramTypesNode.eval( callstack, interpreter );
         } catch ( EvalError e ) {
             throw new InterpreterError("can't eval param types: "+e, e);
         }
@@ -137,10 +145,9 @@ public class DelayedEvalBshMethod extends BshMethod
 
         if ( firstStatement instanceof BSHMethodInvocation ) {
             BSHMethodInvocation methodNode = (BSHMethodInvocation) firstStatement;
-            String methodName = methodNode.getNameNode().text;
-            if ( methodName.equals("super") || methodName.equals("this") ) {
+            if ( methodNode.methodName.equals("super") || methodNode.methodName.equals("this") ) {
                 this.argsNode = methodNode.getArgsNode();
-                return methodName;
+                return methodNode.methodName;
             }
         }
         return null;

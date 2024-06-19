@@ -157,4 +157,9 @@ public final class BSHLiteral extends SimpleNode
     public String toString() {
         return super.toString() + ": " + value;
     }
+
+    @Override
+    public Class<?> getEvalReturnType(NameSpace nameSpace) throws EvalError {
+        return Types.getType(this.value);
+    }
 }

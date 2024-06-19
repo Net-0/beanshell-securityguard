@@ -26,17 +26,20 @@
 package bsh;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map.Entry;
 
 class BSHPrimarySuffix extends SimpleNode
 {
     public static final int
-        CLASS = 6,
-        INDEX = 1,
-        NAME = 2,
-        PROPERTY = 3,
-        NEW = 4;
+        CLASS = 1,
+        INDEX = 2,
+        NAME = 3,
+        PROPERTY = 5,
+        NEW = 6,
+        METHOD_REF = 7;
 
     public int operation;
     Object index;
@@ -117,6 +120,10 @@ class BSHPrimarySuffix extends SimpleNode
 
                 case NEW:
                     return doNewInner(obj, toLHS, callstack, interpreter);
+
+                case METHOD_REF:
+                    return doMethodRef ( obj );
+
                 default:
                     throw new InterpreterError( "Unknown suffix type" );
             }
@@ -359,6 +366,10 @@ class BSHPrimarySuffix extends SimpleNode
         }
     }
 
+    private BshLambda doMethodRef(Object obj) {
+        return BshLambda.fromMethodReference(this, obj, field);
+    }
+
     @Override
     public String toString() {
         if (operation == INDEX)
@@ -373,5 +384,52 @@ class BSHPrimarySuffix extends SimpleNode
             return super.toString() + ":CLASS class";
         return super.toString() + ":NO OPERATION";
     }
+
+    public Class<?> doReturnType(Object obj, NameSpace nameSpace) throws EvalError, UtilEvalError {
+        switch (this.operation) {
+            case CLASS: return Class.class;
+            case INDEX: return ((Class<?>) obj).getComponentType();
+            case NAME: return doNameReturnType( obj, nameSpace );
+            // case PROPERTY: return doProperty( toLHS, obj, callstack, interpreter );
+            // case NEW: return doNewInner(obj, toLHS, callstack, interpreter);
+            case METHOD_REF: return BshLambda.fromMethodReference(this, obj, field).dummyType;
+            default: throw new InterpreterError( "Unknown suffix type" );
+        }
+    }
+
+    private Class<?> doNameReturnType(Object obj, NameSpace nameSpace) throws EvalError, UtilEvalError {
+        boolean isStatic = obj instanceof ClassIdentifier;
+        String wrongStaticMsg = isStatic ? "non static" : "static";
+        Class<?> baseType = isStatic ? ((ClassIdentifier) obj).getTargetClass() : (Class<?>) obj;
+
+        // .length on array
+        if ( !isStatic && baseType.isArray() && this.field.equals("length") )
+            return Integer.TYPE;
+
+        // field access
+        if ( jjtGetNumChildren() == 0 ) {
+            try {
+                Field field = baseType.getField(this.field);
+                if (Reflect.isStatic(field) != isStatic)
+                    throw new UtilEvalError("Can't get " + wrongStaticMsg + " field '" + this.field + "'");
+                return field.getType();
+            } catch (Throwable t) {
+                throw new UtilEvalError("Can't see the type of field '" + field + "'", t);
+            }
+        }
+
+        // method call
+        BSHArguments arguments = (BSHArguments) children[0];
+        Class<?>[] types = arguments.getArgumentsType(nameSpace);
+        try {
+            Method method = baseType.getMethod(this.field, types);
+            if (Reflect.isStatic(method) != isStatic)
+                throw new UtilEvalError("Can't get " + wrongStaticMsg + " method '" + this.field + "'");
+            return method.getReturnType();
+        } catch (Throwable t) {
+            throw new UtilEvalError("Can't see the return type of method '" + field + "'", t);
+        }
+    }
+
 }
 

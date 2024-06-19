@@ -31,7 +31,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import static bsh.ClassGenerator.Type;
+
+import bsh.ClassGenerator.Type;
 
 /**
 */
@@ -49,8 +50,8 @@ class BSHClassDeclaration extends SimpleNode
 
     String name;
     Modifiers modifiers = new Modifiers(Modifiers.CLASS);
-    int numInterfaces;
-    boolean extend;
+    String[] interfacesNames;
+    String superClassName;
     Type type;
     private Class<?> generatedClass;
 
@@ -67,54 +68,58 @@ class BSHClassDeclaration extends SimpleNode
 
 
     private Class<?> generateClass(final CallStack callstack, final Interpreter interpreter) throws EvalError {
-
-        int child = 0;
-
-        // resolve superclass if any
-        Class<?> superClass = null;
-        final List<BshMethod> meths = new ArrayList<>(0);
-        if ( extend ) {
-            BSHAmbiguousName superNode = (BSHAmbiguousName)jjtGetChild(child++);
-            superClass = superNode.toClass( callstack, interpreter );
-            if (Reflect.isGeneratedClass(superClass)) {
-                // Validate final classes should not be extended
-                if (Reflect.getClassModifiers(superClass).hasModifier("final"))
-                    throw new EvalError("Cannot inherit from final class "
-                        + superClass.getName(), null, null);
-                // Collect final methods from all super class namespaces
-                meths.addAll(Stream.of(Reflect.getDeclaredMethods(superClass))
-                    .filter(m->m.hasModifier("final")&&!m.hasModifier("private"))
-                    .collect(Collectors.toList()));
+        try {
+            int child = 0;
+            NameSpace nameSpace = callstack.top();
+    
+            // resolve superclass if any
+            Class<?> superClass = null;
+            final List<BshMethod> meths = new ArrayList<>(0);
+            if ( this.superClassName != null ) {
+                superClass = nameSpace.getClassStrict(this.superClassName);
+                // if (superClass == null) throw new EvalError("", this, )
+                if (Reflect.isGeneratedClass(superClass)) {
+                    // Validate final classes should not be extended
+                    if (Reflect.getClassModifiers(superClass).hasModifier("final"))
+                        throw new EvalError("Cannot inherit from final class "
+                            + superClass.getName(), null, null);
+                    // Collect final methods from all super class namespaces
+                    meths.addAll(Stream.of(Reflect.getDeclaredMethods(superClass))
+                        .filter(m->m.hasModifier("final")&&!m.hasModifier("private"))
+                        .collect(Collectors.toList()));
+                }
             }
+    
+            // Get interfaces
+            Class<?>[] interfaces = new Class[this.interfacesNames.length];
+            for( int i=0; i < interfaces.length; i++) {
+                // BSHAmbiguousName node = (BSHAmbiguousName)jjtGetChild(child++);
+                // interfaces[i] = node.toClass(callstack, interpreter);
+                String interfaceName = this.interfacesNames[i];
+                interfaces[i] = nameSpace.getClassStrict(interfaceName);
+                if (!interfaces[i].isInterface())
+                    throw new EvalError("Type: "+interfaceName+" is not an interface!", this, callstack );
+            }
+    
+            BSHBlock block = (BSHBlock) jjtGetChild(child);
+    
+            if (type == Type.INTERFACE) // this should ideally happen in the parser
+                    modifiers.changeContext(Modifiers.INTERFACE);
+    
+            Class<?> clas = ClassGenerator.getClassGenerator().generateClass(
+                name, modifiers, interfaces, superClass, block, type,
+                callstack, interpreter );
+    
+            // Validate final methods should not be overridden
+            for (BshMethod m : meths)
+               if (null != Reflect.getDeclaredMethod(clas, m.getName(), m.getParameterTypes()))
+                   throw new EvalError("Cannot override "+m.getName()+"() in " +
+                       StringUtil.typeString(superClass) + " overridden method is final", null, null);
+    
+            return clas;
+        } catch (UtilEvalError e) {
+            throw e.toEvalError(this, callstack);
         }
-
-        // Get interfaces
-        Class<?>[] interfaces = new Class[numInterfaces];
-        for( int i=0; i<numInterfaces; i++) {
-            BSHAmbiguousName node = (BSHAmbiguousName)jjtGetChild(child++);
-            interfaces[i] = node.toClass(callstack, interpreter);
-            if ( !interfaces[i].isInterface() )
-                throw new EvalError(
-                    "Type: "+node.text+" is not an interface!",
-                    this, callstack );
-        }
-
-        BSHBlock block = (BSHBlock) jjtGetChild(child);
-
-        if (type == Type.INTERFACE) // this should ideally happen in the parser
-                modifiers.changeContext(Modifiers.INTERFACE);
-
-        Class<?> clas = ClassGenerator.getClassGenerator().generateClass(
-            name, modifiers, interfaces, superClass, block, type,
-            callstack, interpreter );
-
-        // Validate final methods should not be overridden
-        for (BshMethod m : meths)
-           if (null != Reflect.getDeclaredMethod(clas, m.getName(), m.getParameterTypes()))
-               throw new EvalError("Cannot override "+m.getName()+"() in " +
-                   StringUtil.typeString(superClass) + " overridden method is final", null, null);
-
-        return clas;
     }
 
     public String toString() {

@@ -45,6 +45,7 @@ class BSHTryStatement extends SimpleNode
     public Object eval( CallStack callstack, Interpreter interpreter)
         throws EvalError
     {
+        this.dumpClasses("");
         int i = 0;
 
         if (jjtGetChild(i) instanceof BSHTryWithResources) {

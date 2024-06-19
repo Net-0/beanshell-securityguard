@@ -39,6 +39,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import bsh.BshClassManager;
 import bsh.ClassPathException;
@@ -294,6 +296,61 @@ public class ClassManagerImpl extends BshClassManager
         cacheClassInfo( name, c );
 
         return c;
+    }
+
+    /**
+     * Return a list of string with all packages name for this ClassManager.
+     * <p>
+     * Obs.: The returned list can have duplicated packages!
+     * <p>
+     * E.g.:
+     * <pre>
+     * [
+     * "java.lang",
+     * "java.util",
+     * "java.util.logging",
+     * "java.util.concurrent",
+     * "java.util.stream",
+     * "java.util.jar"
+     * ]
+     * </pre>
+     */
+    public List<String> getPackages() {
+        List<String> pkgs = new ArrayList<>();
+
+        /** It's just a util class to we be able to get all the packages of a {@link ClassLoader} */
+        class ClassLoaderDumper extends ClassLoader {
+            protected ClassLoaderDumper(ClassLoader parent) {
+                super(parent);
+            }
+            public List<String> getPackagesNames() {
+                return Stream.of(super.getPackages())
+                            .map(p -> p.getName())
+                            .collect(Collectors.toList());
+            }
+        }
+
+        if (this.baseLoader != null) {
+            ClassLoaderDumper dumper = new ClassLoaderDumper(this.baseLoader);
+            pkgs.addAll(dumper.getPackagesNames());
+        }
+
+        if (this.externalClassLoader != null) {
+            ClassLoaderDumper dumper = new ClassLoaderDumper(this.externalClassLoader);
+            pkgs.addAll(dumper.getPackagesNames());
+        }
+
+        final ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        if (contextClassLoader != null) {
+            ClassLoaderDumper dumper = new ClassLoaderDumper(contextClassLoader);
+            pkgs.addAll(dumper.getPackagesNames());
+        }
+
+        return pkgs;
+        // List<String> pkgs = new ArrayList<>();
+        // pkgs.addAll(this.baseClassPath.getPackagesSet());
+        // return pkgs;
+        // return new ArrayList<>(this.baseClassPath.getPackagesSet());
     }
 
     /**

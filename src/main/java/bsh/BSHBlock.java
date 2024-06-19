@@ -183,6 +183,11 @@ class BSHBlock extends SimpleNode {
     }
 
     @Override
+    public Class<?> getEvalReturnType(NameSpace nameSpace) throws EvalError {
+        return Void.TYPE;
+    }
+
+    @Override
     public String toString() {
         return super.toString() + ": static=" + isStatic + ", synchronized=" + isSynchronized;
     }

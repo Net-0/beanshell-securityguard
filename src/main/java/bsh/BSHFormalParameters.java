@@ -64,17 +64,22 @@ class BSHFormalParameters extends SimpleNode implements BshClassManager.Listener
         this.paramModifiers = paramModifiers;
     }
 
-    public Modifiers [] getParamModifiers() {
+    public Modifiers[] getParamModifiers() {
         insureParsed();
         return paramModifiers;
     }
 
-    public String [] getParamNames() {
+    public Class<?>[] getParamTypes() {
+        return this.paramTypes;
+    }
+
+    public String[] getParamNames() {
         insureParsed();
         return paramNames;
     }
 
-    public String [] getTypeDescriptors(
+    // TODO: remove it
+    public String[] getTypeDescriptors(
         CallStack callstack, Interpreter interpreter, String defaultPackage )
     {
         if ( typeDescriptors != null )
@@ -98,7 +103,7 @@ class BSHFormalParameters extends SimpleNode implements BshClassManager.Listener
         Evaluate the types.
         Note that type resolution does not require the interpreter instance.
     */
-    public Object eval( CallStack callstack, Interpreter interpreter )
+    public Class<?>[] eval( CallStack callstack, Interpreter interpreter )
         throws EvalError
     {
         if ( paramTypes != null )

@@ -819,6 +819,10 @@ public final class This implements java.io.Serializable, Runnable
             return This.getThis(null, null);
     }
 
+    public Object getInstance() {
+        return this.namespace.classInstance;
+    }
+
     /**
      * A ConstructorArgs object holds evaluated arguments for a constructor
      * call as well as the index of a possible alternate selector to invoke.

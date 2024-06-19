@@ -28,21 +28,18 @@
 
 package bsh;
 
-public class BSHPackageDeclaration extends SimpleNode
-{
+public class BSHPackageDeclaration extends SimpleNode {
 
-  public BSHPackageDeclaration(int id) {
-    super(id);
+  String packageName;
+
+  public BSHPackageDeclaration(int id) { super(id); }
+
+  @Override
+  public Object eval(CallStack callstack, Interpreter interpreter) throws EvalError {
+    System.out.println("PackageDeclaration: " + this.packageName);
+    NameSpace namespace = callstack.top();
+    namespace.setPackage(this.packageName);
+    namespace.importPackage(this.packageName); // import the package we're in by default...
+    return Primitive.VOID;
   }
-
-    public Object eval( CallStack callstack, Interpreter interpreter )
-        throws EvalError
-    {
-        BSHAmbiguousName name = (BSHAmbiguousName)jjtGetChild(0);
-        NameSpace namespace = callstack.top();
-        namespace.setPackage( name.text );
-        // import the package we're in by default...
-        namespace.importPackage( name.text );
-        return Primitive.VOID;
-    }
 }

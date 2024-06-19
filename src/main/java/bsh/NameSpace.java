@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 
 /** A namespace in which methods, variables, and imports (class names) live.
  * This is package public because it is used in the implementation of some bsh
@@ -127,6 +128,7 @@ public class NameSpace
         this.importObject(instance);
     }
 
+    // TODO: remove it ? The method should be just in bsh.This ?
     /** Gets the class instance.
      * @return the class instance
      * @throws UtilEvalError the util eval error */
@@ -1003,18 +1005,46 @@ public class NameSpace
         this.classCache.put(name, c);
     }
 
-    /** Load a class through this namespace taking into account imports. The
-     * class search will proceed through the parent namespaces if necessary.
+    /**
+     * Load a class through this namespace taking into account imports.
+     * The class search will proceed through the parent namespaces if necessary.
+     * @param name the name
+     * @throws UtilEvalError if there is a problem resolving a imported class name or if the class was not found
+     */
+    Class<?> getClassStrict(final String name) throws UtilEvalError {
+        Class<?> _class = this.getClass(name);
+        if (_class == null) throw new UtilEvalError("Class not found: " + name);
+        return _class;
+    }
+
+    /**
+     * Load a class through this namespace taking into account imports.
+     * The class search will proceed through the parent namespaces if necessary.
      * @param name the name
      * @return null if not found.
-     * @throws UtilEvalError the util eval error */
+     * @throws UtilEvalError if there is a problem resolving a imported class name
+     */
     public Class<?> getClass(final String name) throws UtilEvalError {
         final Class<?> c = this.getClassImpl(name);
-        if (c != null)
-            return c;
-        if (this.parent != null)
-            return this.parent.getClass(name);
-        return null;
+        if (c != null) return c;
+
+        // Resolve static inner classes
+        String[] parts = name.split("\\.");
+        StringBuilder baseClassNameSB = new StringBuilder(parts[0]);
+        for (int i = 1; i < parts.length; i++) {
+            baseClassNameSB.append(".").append(parts[i]);
+            Class<?> baseClass = this.getClassImpl(baseClassNameSB.toString());
+            if (baseClass == null) continue;
+
+            StringBuilder classNameSB = new StringBuilder(baseClass.getName());
+            for (; i < parts.length; i++) classNameSB.append("$").append(parts[i]);
+            Class<?> _class = this.classForName(classNameSB.toString());
+            if (_class != null) return _class;
+        }
+
+        if (this.parent != null) return this.parent.getClass(name);
+        // return null;
+        throw new UtilEvalError("C");
     }
 
     /** Implementation of getClass() Load a class through this namespace taking
@@ -1029,7 +1059,8 @@ public class NameSpace
      * searching through the imports for them each time.
      * @param name the name
      * @return null if not found.
-     * @throws UtilEvalError the util eval error */
+     * @throws UtilEvalError if there is a problem resolving a imported class name
+     */
     private Class<?> getClassImpl(final String name) throws UtilEvalError {
         Class<?> c = null;
         // Check the cache
@@ -1062,7 +1093,8 @@ public class NameSpace
      * (no parent chain).
      * @param name the name
      * @return the imported class impl
-     * @throws UtilEvalError the util eval error */
+     * @throws UtilEvalError if there is a problem resolving a imported class name
+     */
     private Class<?> getImportedClassImpl(final String name) throws UtilEvalError {
         // Try explicitly imported class, e.g. import foo.Bar;
         String fullname = this.importedClasses.get(name);
@@ -1072,20 +1104,14 @@ public class NameSpace
             /* Found the full name in imported classes. */
             // Try to make the full imported name
             Class<?> clas = this.classForName(fullname);
-
-            if ( clas != null )
-                return clas;
+            if ( clas != null ) return clas;
 
             // Handle imported inner class case
             // Imported full name wasn't found as an absolute class
             // If it is compound, try to resolve to an inner class.
             // (maybe this should happen in the BshClassManager?)
-            if (Name.isCompound(fullname))
-                try {
-                    clas = this.getNameResolver(fullname).toClass();
-                } catch (final ClassNotFoundException e) { /* not a class */ }
-            Interpreter.debug(
-                        "imported unpackaged name not found:", fullname);
+            if (Name.isCompound(fullname)) clas = this.getClass(fullname);
+            Interpreter.debug("imported unpackaged name not found:", fullname);
             // If found cache the full name in the BshClassManager
             if (clas != null) {
                 // (should we cache info in not a class case too?)
@@ -1110,8 +1136,7 @@ public class NameSpace
          * exists... */
         if (bcm.hasSuperImport()) {
             final String s = bcm.getClassNameByUnqName(name);
-            if (s != null)
-                return this.classForName(s);
+            if (s != null) return this.classForName(s);
         }
         return null;
     }
@@ -1550,7 +1575,6 @@ public class NameSpace
         }
     }
 
-
     NameSpace copy() {
         try {
             final NameSpace clone = (NameSpace) clone();
@@ -1585,4 +1609,37 @@ public class NameSpace
         return new ArrayList<T>(list);
     }
 
+    /** Returns a new {@link NameSpace} to be used by lambda expressions; an {@link NameSpace} where all inherited variables are final, as they're in standard Java */
+    protected NameSpace toLambdaNameSpace() {
+        NameSpace lambdaNS = this.copy();
+        Stack<NameSpace> parents = new Stack<>();
+        for (NameSpace ns = this.parent; ns != null; ns = ns.parent) parents.add(ns);
+        while (!parents.isEmpty()) { // Add all variables from the most far parent to 'this.parent'
+            NameSpace parent = parents.pop();
+            if (parent.isClass || parent.isEnum) continue;
+            lambdaNS.variables.putAll(parent.variables);
+        }
+
+        // Change all variables to be final
+        lambdaNS.variables.replaceAll((k, v) -> {
+            Variable clone = v.clone();
+            clone.modifiers.addModifier("final");
+            return clone;
+        });
+        return lambdaNS;
+    }
+
+    /** @return the enclosing class body namespace or null if not in a class. */
+    NameSpace getClassNameSpace() {
+        if ( this.isClass ) return this; // is a class instance
+
+        // is a method parent is a class
+        if ( this.isMethod && this.parent != null && this.parent.isClass ) return this.parent;
+
+        return null;
+    }
+
+    PackageIdentifier getPackageIdentifier(String packageName) {
+        return new PackageIdentifier(this.getClassManager(), packageName);
+    }
 }

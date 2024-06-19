@@ -257,6 +257,13 @@ class Name implements java.io.Serializable
                     interpreter, varName, true );
             }
 
+            // System.out.println("-----------------------------------------");
+            // System.out.println("Name [1] -> evalBaseObject: " + evalBaseObject);
+            // System.out.println("Name [1] -> this.value: " + this.value);
+            // System.out.println("Name [1] -> varName: " + varName);
+            // System.out.println("Name [1] -> obj: " + obj);
+            // System.out.println("-----------------------------------------");
+
             if ( obj != Primitive.VOID )
             {
                 // Resolved the variable
@@ -296,6 +303,7 @@ class Name implements java.io.Serializable
             Interpreter.debug( "not a class, trying var prefix ", evalName );
         }
 
+        // Notes: funcionalidade strictJava=false, ele seta variáveis q n existem em um NameSpace
         // No variable or class found in 'this' type ref.
         // if autoAllocateThis then create one; a child 'this'.
         if ( ( evalBaseObject == null || evalBaseObject instanceof This  )
@@ -307,6 +315,12 @@ class Name implements java.io.Serializable
             Object obj = new NameSpace(
                 targetNameSpace, "auto: "+varName ).getThis( interpreter );
             targetNameSpace.setVariable( varName, obj, false, evalBaseObject == null );
+            // System.out.println("-----------------------------------------");
+            // System.out.println("Name [2] -> evalBaseObject: " + evalBaseObject);
+            // System.out.println("Name [2] -> this.value: " + this.value);
+            // System.out.println("Name [2] -> varName: " + varName);
+            // System.out.println("Name [2] -> obj: " + obj);
+            // System.out.println("-----------------------------------------");
             return completeRound( varName, suffix(evalName), obj );
         }
 
@@ -595,7 +609,7 @@ class Name implements java.io.Serializable
                 && thisNameSpace.getParent().isClass )
             return thisNameSpace.getParent();
 
-        return null;
+        return null; //getClassNameSpace(thisNameSpace.getParent());
     }
 
     /**

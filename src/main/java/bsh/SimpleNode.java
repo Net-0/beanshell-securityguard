@@ -172,9 +172,9 @@ class SimpleNode implements Node, Serializable {
         return jjtGetChildren().length;
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public String toString() { return ParserTreeConstants.jjtNodeName[id]; }
+    // /** {@inheritDoc} */
+    // @Override
+    // public String toString() { return ParserTreeConstants.jjtNodeName[id]; }
 
     /** {@inheritDoc} */
     @Override
@@ -188,6 +188,15 @@ class SimpleNode implements Node, Serializable {
             Node n = children[i];
             if (n != null)
                 n.dump(prefix + " ");
+        }
+    }
+
+    public void dumpClasses(String prefix) {
+        System.out.println(prefix + this.getClass().getName());
+        if (children != null) for (int i = 0; i < children.length; ++i) {
+            SimpleNode n = (SimpleNode) children[i];
+            if (n != null)
+                n.dumpClasses(prefix + " ");
         }
     }
 
@@ -243,5 +252,11 @@ class SimpleNode implements Node, Serializable {
     /** {@inheritDoc} */
     @Override
     public int getId() { return this.id; }
+
+    /** {@inheritDoc} */
+    @Override
+    public Class<?> getEvalReturnType(NameSpace nameSpace) throws EvalError {
+        throw new EvalError(this.getClass().getName() + " doesn't implements 'getEvalReturnType'", this, null);
+    }
 }
 

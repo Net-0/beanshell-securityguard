@@ -30,45 +30,44 @@ package bsh;
 
 import java.lang.reflect.Array;
 
+import bsh.org.objectweb.asm.Type;
+
 class BSHType extends SimpleNode implements BshClassManager.Listener {
+
     private static final long serialVersionUID = 1L;
+
     /**
         baseType is used during evaluation of full type and retained for the
         case where we are an array type.
         In the case where we are not an array this will be the same as type.
     */
-    private Class<?> baseType;
+    Class<?> baseType;
+
     /**
         If we are an array type this will be non zero and indicate the
         dimensionality of the array.  e.g. 2 for String[][];
     */
-    private int arrayDims;
+    int arrayDimensions;
 
-    /**
-        Internal cache of the type.  Cleared on classloader change.
-    */
-    private Class<?> type;
+    /** Internal cache of the type.  Cleared on classloader change. */
+    Class<?> type;
 
     /** Flag to track if instance is already a listener */
     private boolean isListener = false;
 
-    String descriptor;
+    /** It's the baseType name */
+    String baseName;
+    // String descriptor;
 
-    BSHType(int id) {
-        super(id);
-    }
+    BSHType(int id) { super(id); }
 
-    /**
-        Used by the grammar to indicate dimensions of array types
-        during parsing.
-    */
-    public void addArrayDimension() {
-        arrayDims++;
-    }
+    // /**
+    //     Used by the grammar to indicate dimensions of array types
+    //     during parsing.
+    // */
+    // public void addArrayDimension() { arrayDimensions++; }
 
-    Node getTypeNode() {
-        return jjtGetChild(0);
-    }
+    // Node getTypeNode() { return jjtGetChild(0); }
 
     /**
          Returns a class descriptor for this type.
@@ -77,98 +76,98 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
          If it is not found and the name is non-compound we assume the default
          package for the name.
     */
-    public String getTypeDescriptor(
-        CallStack callstack, Interpreter interpreter, String defaultPackage )
-    {
-        // return cached type if available
-        if ( descriptor != null )
-            return descriptor;
+    public String getTypeDescriptor(CallStack callStack, Interpreter interpreter, String defaultPackage ) {
+        return null;
+        // // return cached type if available
+        // if ( descriptor != null )
+        //     return descriptor;
 
-        String descriptor;
-        //  first node will either be PrimitiveType or AmbiguousName
-        Node node = getTypeNode();
-        if ( node instanceof BSHPrimitiveType )
-            descriptor = getTypeDescriptor( ((BSHPrimitiveType)node).type );
-        else
-        {
-            String clasName = ((BSHAmbiguousName)node).text;
-            String innerClass = callstack.top().importedClasses.get(clasName);
+        // String descriptor;
+        // //  first node will either be PrimitiveType or AmbiguousName
+        // Node node = getTypeNode();
+        // if ( node instanceof BSHPrimitiveType )
+        //     descriptor = getTypeDescriptor( ((BSHPrimitiveType)node).type );
+        // else
+        // {
+        //     String clasName = ((BSHAmbiguousName)node).text;
+        //     String innerClass = callStack.top().importedClasses.get(clasName);
 
-            Class<?> clas = null;
-            if ( innerClass == null ) try {
-                clas = ((BSHAmbiguousName)node).toClass(
-                    callstack, interpreter );
-            } catch ( EvalError e ) {
-                // Lets assume we have a generics raw type
-                if (clasName.length() == 1)
-                    clasName = "java.lang.Object";
-            } else
-                clasName = innerClass.replace('.', '$');
+        //     Class<?> clas = null;
+        //     if ( innerClass == null ) try {
+        //         clas = ((BSHAmbiguousName)node).toClass( callStack, interpreter );
+        //     } catch ( EvalError e ) {
+        //         // Lets assume we have a generics raw type
+        //         if (clasName.length() == 1)
+        //             clasName = "java.lang.Object";
+        //     } else
+        //         clasName = innerClass.replace('.', '$');
 
-            if ( clas != null ) {
-                descriptor = getTypeDescriptor( clas );
-            } else {
-                if ( defaultPackage == null || Name.isCompound( clasName ) )
-                    descriptor = "L" + clasName.replace('.','/') + ";";
-                else
-                    descriptor =
-                        "L"+defaultPackage.replace('.','/')+"/"+clasName + ";";
-            }
-        }
+        //     if ( clas != null ) {
+        //         descriptor = getTypeDescriptor( clas );
+        //     } else {
+        //         if ( defaultPackage == null || Name.isCompound( clasName ) )
+        //             descriptor = "L" + clasName.replace('.','/') + ";";
+        //         else
+        //             descriptor =
+        //                 "L"+defaultPackage.replace('.','/')+"/"+clasName + ";";
+        //     }
+        // }
 
-        for(int i=0; i<arrayDims; i++)
-            descriptor = "["+descriptor;
+        // for(int i=0; i<arrayDimensions; i++)
+        //     descriptor = "["+descriptor;
 
-        this.descriptor = descriptor;
-        return descriptor;
+        // this.descriptor = descriptor;
+        // return descriptor;
     }
 
-    public Class<?> getType( CallStack callstack, Interpreter interpreter )
-        throws EvalError
-    {
-        // return cached type if available
-        if ( type != null )
-            return type;
-
-        //  first node will either be PrimitiveType or AmbiguousName
-        Node node = getTypeNode();
-        if ( node instanceof BSHPrimitiveType )
-            baseType = ((BSHPrimitiveType)node).getType();
-        else
-            try {
-            baseType = ((BSHAmbiguousName)node).toClass(
-                callstack, interpreter );
-            } catch (EvalError e) {
-                // Assuming generics raw type
-                if (node.getText().trim().length() == 1
-                        && e.getCause() instanceof ClassNotFoundException)
-                    baseType = Object.class;
-                else
-                    throw e; // roll up unhandled error
+    public Class<?> getType( CallStack callStack, Interpreter interpreter ) throws EvalError {
+        try {
+            // return cached type if available
+            if (this.type != null ) return this.type;
+    
+            this.baseType = this.evalBaseType(callStack.top());
+    
+            if (this.arrayDimensions > 0) {
+                Object array = Array.newInstance(this.baseType, new int[this.arrayDimensions]);
+                this.type = array.getClass();
+            } else {
+                this.type = this.baseType;
             }
-
-        if ( arrayDims > 0 ) {
-            try {
-                // Get the type by constructing a prototype array with
-                // arbitrary (zero) length in each dimension.
-                int[] dims = new int[arrayDims]; // int array default zeros
-                Object obj = Array.newInstance(
-                        null == baseType ? Object.class : baseType, dims);
-                type = obj.getClass();
-            } catch(Exception e) {
-                throw new EvalError("Couldn't construct array type",
-                    this, callstack, e);
+    
+            // add listener to reload type if class is reloaded see #699
+            if (!this.isListener) { // only add once
+                interpreter.getClassManager().addListener(this);
+                this.isListener = true;
             }
-        } else
-            type = baseType;
-
-        // add listener to reload type if class is reloaded see #699
-        if (!isListener) { // only add once
-            interpreter.getClassManager().addListener(this);
-            isListener = true;
+    
+            return this.type;
+        } catch (UtilEvalError e) {
+            throw e.toEvalError(this, callStack);
         }
+    }
 
-        return type;
+    private Class<?> evalBaseType(NameSpace nameSpace) throws UtilEvalError {
+        System.out.println("BSHType.evalBaseType() ("+this+") -> this.baseName: " + this.baseName);
+        switch (this.baseName) {
+            case "boolean": return Boolean.TYPE;
+            case "char": return Character.TYPE;
+            case "byte": return Byte.TYPE;
+            case "short": return Short.TYPE;
+            case "int": return Integer.TYPE;
+            case "long": return Long.TYPE;
+            case "float": return Float.TYPE;
+            case "double": return Double.TYPE;
+            default: {
+                try {
+                    return nameSpace.getClassStrict(this.baseName);
+                } catch (UtilEvalError e) {
+                    // TODO: mustn't all generic types be declared in class NameSpace and be resolved by it ?
+                    // Assuming generics raw type
+                    if (!this.baseName.contains(".")) return Object.class;
+                    throw e;
+                }
+            }
+        }
     }
 
     /**
@@ -177,14 +176,22 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
         In the case where we are not an array this will be the same as type.
     */
     public Class<?> getBaseType() {
+        if (this.baseType != null) return this.baseType;
+
+        switch (this.baseName) {
+            case "boolean": this.baseType = Boolean.TYPE; break;
+            case "char": this.baseType = Character.TYPE; break;
+            case "byte": this.baseType = Byte.TYPE; break;
+            case "short": this.baseType = Short.TYPE; break;
+            case "int": this.baseType = Integer.TYPE; break;
+            case "long": this.baseType = Long.TYPE; break;
+            case "float": this.baseType = Float.TYPE; break;
+            case "double": this.baseType = Double.TYPE; break;
+            // TODO: ver isso
+            // default: this.baseType = //t=<COMPLEX_IDENTIFIER>
+        }
+
         return baseType;
-    }
-    /**
-        If we are an array type this will be non zero and indicate the
-        dimensionality of the array.  e.g. 2 for String[][];
-    */
-    public int getArrayDims() {
-        return arrayDims;
     }
 
     /** Clear instance cache to reload types on class loader change #699 */
@@ -193,23 +200,32 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
         baseType = null;
     }
 
+    // TODO: delete this method
     public static String getTypeDescriptor( Class<?> clas )
     {
-        if ( clas == Boolean.TYPE ) return "Z";
-        if ( clas == Character.TYPE ) return "C";
-        if ( clas == Byte.TYPE ) return "B";
-        if ( clas == Short.TYPE ) return "S";
-        if ( clas == Integer.TYPE ) return "I";
-        if ( clas == Long.TYPE ) return "J";
-        if ( clas == Float.TYPE ) return "F";
-        if ( clas == Double.TYPE ) return "D";
-        if ( clas == Void.TYPE ) return "V";
+        return Type.getDescriptor(clas);
+        // if ( clas == Boolean.TYPE ) return "Z";
+        // if ( clas == Character.TYPE ) return "C";
+        // if ( clas == Byte.TYPE ) return "B";
+        // if ( clas == Short.TYPE ) return "S";
+        // if ( clas == Integer.TYPE ) return "I";
+        // if ( clas == Long.TYPE ) return "J";
+        // if ( clas == Float.TYPE ) return "F";
+        // if ( clas == Double.TYPE ) return "D";
+        // if ( clas == Void.TYPE ) return "V";
 
-        String name = clas.getName().replace('.','/');
+        // String name = clas.getName().replace('.','/');
 
-        if ( name.startsWith("[") || name.endsWith(";") )
-            return name;
-        else
-            return "L"+ name.replace('.','/') +";";
+        // if ( name.startsWith("[") || name.endsWith(";") )
+        //     return name;
+        // else
+        //     return "L"+ name.replace('.','/') +";";
+    }
+
+    public ClassIdentifier getClassIdentifier(NameSpace nameSpace) throws EvalError {
+        CallStack callStack = new CallStack(nameSpace);
+        Interpreter interpreter = new Interpreter(nameSpace);
+        Class<?> clazz = this.getType(callStack, interpreter);
+        return new ClassIdentifier(clazz);
     }
 }

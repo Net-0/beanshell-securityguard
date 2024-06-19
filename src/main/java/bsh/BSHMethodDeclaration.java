@@ -36,8 +36,6 @@ class BSHMethodDeclaration extends SimpleNode
     BSHReturnType returnTypeNode;
     BSHFormalParameters paramsNode;
     BSHBlock blockNode;
-    // index of the first throws clause child node
-    int firstThrowsClause;
 
     // End Child node structure evaluated by insureNodesParsed
 
@@ -45,7 +43,7 @@ class BSHMethodDeclaration extends SimpleNode
 
     // Unsafe caching of type here.
     Class<?> returnType;  // null (none), Void.TYPE, or a Class
-    int numThrows = 0;
+    String[] exceptionsNames;
     boolean isVarArgs;
     private boolean isScriptedObject;
 
@@ -61,19 +59,17 @@ class BSHMethodDeclaration extends SimpleNode
             return;
 
         Object firstNode = jjtGetChild(0);
-        firstThrowsClause = 1;
         if ( firstNode instanceof BSHReturnType )
         {
             returnTypeNode = (BSHReturnType)firstNode;
             paramsNode = (BSHFormalParameters)jjtGetChild(1);
-            if ( jjtGetNumChildren() > 2+numThrows )
-                blockNode = (BSHBlock)jjtGetChild(2+numThrows); // skip throws
-            ++firstThrowsClause;
+            if ( jjtGetNumChildren() > 2 )
+                blockNode = (BSHBlock)jjtGetChild(2); // skip throws
         }
         else
         {
             paramsNode = (BSHFormalParameters)jjtGetChild(0);
-            blockNode = (BSHBlock)jjtGetChild(1+numThrows); // skip throws
+            blockNode = (BSHBlock)jjtGetChild(1); // skip throws
         }
 
         if (null != blockNode && blockNode.jjtGetNumChildren() > 0) {
@@ -149,15 +145,16 @@ class BSHMethodDeclaration extends SimpleNode
         return Primitive.VOID;
     }
 
-    private void evalNodes( CallStack callstack, Interpreter interpreter )
-        throws EvalError
-    {
+    private void evalNodes( CallStack callstack, Interpreter interpreter ) throws EvalError {
         insureNodesParsed();
+        NameSpace nameSpace = callstack.top();
 
-        // validate that the throws names are class names
-        for(int i=firstThrowsClause; i<numThrows+firstThrowsClause; i++)
-            ((BSHAmbiguousName)jjtGetChild(i)).toClass(
-                callstack, interpreter );
+        try {
+            for (String exceptionName: this.exceptionsNames)
+                nameSpace.getClassStrict(exceptionName);
+        } catch (UtilEvalError e) {
+            throw e.toEvalError(this, callstack);
+        }
 
         paramsNode.eval( callstack, interpreter );
 

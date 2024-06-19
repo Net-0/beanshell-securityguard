@@ -91,8 +91,8 @@ class BSHVariableDeclarator extends SimpleNode
     private int getArrayDims(BSHType typeNode) {
         if ( dimensions > 0 )
             return dimensions;
-        if ( typeNode.getArrayDims() > 0 )
-            return typeNode.getArrayDims();
+        if ( typeNode.arrayDimensions > 0 )
+            return typeNode.arrayDimensions;
         return -1;
     }
 

@@ -106,6 +106,7 @@ package bsh;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.util.*;
 
 /**
     This is the BeanShell parser.  It is used internally by the Interpreter
@@ -315,34 +316,27 @@ SPECIAL_TOKEN : /* COMMENTS */
 TOKEN : /* RESERVED WORDS AND LITERALS */
 {
 < ABSTRACT : "abstract" >
-| < BOOLEAN: "boolean" >
 | < BREAK: "break" >
 | < CLASS: "class" >
-| < BYTE: "byte" >
 | < CASE: "case" >
 | < CATCH: "catch" >
-| < CHAR: "char" >
 | < CONST: "const" >
 | < CONTINUE: "continue" >
 | < _DEFAULT: "default" >
 | < DO: "do" >
-| < DOUBLE: "double" >
 | < ELSE: "else" >
 | < ENUM: "enum" >
 | < EXTENDS: "extends" >
 | < FALSE: "false" >
 | < FINAL: "final" >
 | < FINALLY: "finally" >
-| < FLOAT: "float" >
 | < FOR: "for" >
 | < GOTO: "goto" >
 | < IF: "if" >
 | < IMPLEMENTS: "implements" >
 | < IMPORT: "import" >
 | < INSTANCEOF: "instanceof" >
-| < INT: "int" >
 | < INTERFACE: "interface" >
-| < LONG: "long" >
 | < NATIVE: "native" >
 | < NEW: "new" >
 | < NULL: "null" >
@@ -351,7 +345,6 @@ TOKEN : /* RESERVED WORDS AND LITERALS */
 | < PROTECTED: "protected" >
 | < PUBLIC: "public" >
 | < RETURN: "return" >
-| < SHORT: "short" >
 | < STATIC: "static" >
 | < STRICTFP : "strictfp" >
 | < SWITCH: "switch" >
@@ -364,6 +357,7 @@ TOKEN : /* RESERVED WORDS AND LITERALS */
 | < VOID: "void" >
 | < VOLATILE: "volatile" >
 | < WHILE: "while" >
+| < PRIMITIVE_TYPE : "boolean" | "char" | "byte" | "short" | "int" | "long" | "float" | "double" >
 }
 
 TOKEN : /* LITERALS */
@@ -591,31 +585,31 @@ void ClassDeclaration() #ClassDeclaration :
 {
     Modifiers mods;
     Token name;
-    int numInterfaces;
+    String[] interfacesNames = new String[0];
+    String superClassName;
 }
 {
     mods = Modifiers( Modifiers.CLASS, false )
   (
     (
         "class" { jjtThis.type = ClassGenerator.Type.CLASS; } name=<IDENTIFIER>
-        [ "extends" AmbiguousName() { jjtThis.extend = true; } ]
-        [ "implements" numInterfaces=NameList()
-        { jjtThis.numInterfaces=numInterfaces; } ]
+        [ "extends" superClassName=Name() { jjtThis.superClassName = superClassName; } ]
+        [ "implements" interfacesNames=NameList() ]
       |
-        "interface" { jjtThis.type = ClassGenerator.Type.INTERFACE; } name=<IDENTIFIER>
-        [ "extends" numInterfaces=NameList()
-            { jjtThis.numInterfaces=numInterfaces; } ]
+        "interface" { jjtThis.type = ClassGenerator.Type.INTERFACE; }
+        name=<IDENTIFIER>
+        [ "extends" interfacesNames=NameList() ]
     )
     Block()
   |
     "enum" { jjtThis.type = ClassGenerator.Type.ENUM; } name=<IDENTIFIER>
-    [ "implements" numInterfaces=NameList()
-    { jjtThis.numInterfaces=numInterfaces; } ]
+    [ "implements" interfacesNames=NameList() ]
     EnumBlock()
   )
     {
         if (null != mods) jjtThis.modifiers = mods;
         jjtThis.name = name.image;
+        jjtThis.interfacesNames=interfacesNames;
     }
 }
 
@@ -643,6 +637,7 @@ void MethodDeclaration() #MethodDeclaration :
     Token t = null;
     Modifiers mods;
     int count;
+    String[] exceptionsNames;
 }
 {
     mods = Modifiers( Modifiers.METHOD, false ) { if (null != mods) jjtThis.modifiers = mods; }
@@ -654,22 +649,24 @@ void MethodDeclaration() #MethodDeclaration :
     t = <IDENTIFIER> { jjtThis.name = t.image; }
 )
     FormalParameters()
-    [ "throws" count=NameList() { jjtThis.numThrows=count; } ]
+    [ "throws" exceptionsNames=NameList() { jjtThis.exceptionsNames=exceptionsNames; } ]
     ( Block() | ";" )
 }
 
 void PackageDeclaration () #PackageDeclaration:
-{ }
+{ String packageName; }
 {
-    "package" AmbiguousName()
+    "package" packageName=Name()
+    { jjtThis.packageName = packageName; }
 }
 
 void ImportDeclaration() #ImportDeclaration :
-{ }
+{ String name; }
 {
   LOOKAHEAD( 3 )
   "import" [ "static" { jjtThis.staticImport = true; } ]
-  AmbiguousName() [ "." "*" { jjtThis.importPackage = true; } ] ";"
+  name=Name() [ "." "*" { jjtThis.importPackage = true; } ] ";"
+  { jjtThis.name = name; }
 |
    // bsh super import statement
   "import" "*" ";" { jjtThis.superImport = true; }
@@ -723,19 +720,25 @@ void FormalParameter() #FormalParameter :
 }
 
 
-/*
-    Type, name and expression syntax follows.
-*/
+/* Type, name and expression syntax follows. */
 void Type() #Type :
-{ }
 {
+  String name;
+  int arrayDimensions = 0;
+}
+{
+  (
+      name = <PRIMITIVE_TYPE>.image
+    | name = Name()
+  )
+  { jjtThis.baseName = name; System.out.println("bsh.jjt -> #Type ("+jjtThis+") -> name: " + name); }
     /*
         The embedded lookahead is (was?) necessary to disambiguate for
         PrimaryPrefix.  ( )* is a choice point.  It took me a while to
         figure out where to put that.  This stuff is annoying.
     */
-  ( PrimitiveType() | AmbiguousName() )
-    ( LOOKAHEAD(2) "[" "]" { jjtThis.addArrayDimension(); } )*
+  ( LOOKAHEAD("[" "]") "[" "]" { arrayDimensions++; } )*
+  { jjtThis.arrayDimensions=arrayDimensions; }
 }
 
 /*
@@ -749,6 +752,7 @@ void ReturnType() #ReturnType :
   Type()
 }
 
+// TODO: apagar isso!
 void PrimitiveType() #PrimitiveType :
 { } {
   "boolean" { jjtThis.type = Boolean.TYPE; }
@@ -779,11 +783,32 @@ void AmbiguousName() #AmbiguousName :
   }
 }
 
-int NameList() :
-{ int count = 1; }
+void NameNode() #Name :
+{ Token t; }
 {
-  AmbiguousName() ( "," AmbiguousName() { ++count; } )*
-  { return count; }
+  t = <IDENTIFIER> { jjtThis.name = t.image; }
+}
+
+String Name():
+{
+  Token t;
+  List<String> parts = new ArrayList<String>();
+}
+{
+  t=<IDENTIFIER> { parts.add(t.image); }
+  ("." t=<IDENTIFIER> { parts.add(t.image); } )*
+  { return String.join(".", parts); }
+}
+
+String[] NameList() :
+{
+  List<String> names = new ArrayList<String>();
+  String name;
+}
+{
+  name=Name() { names.add(name); }
+  ( "," name=Name() { names.add(name); } )
+  { return names.toArray(new String[0]); }
 }
 
 /*
@@ -947,22 +972,15 @@ void UnaryExpression() :
   (t = <INCR> | t = <DECR>) PrimaryExpression()
     { jjtThis.kind = t.kind; } #UnaryExpression(1)
 |
+  LOOKAHEAD(( FormalParameters() | <IDENTIFIER> ) "->")
+    LambdaExpression()
+|
   // cast
-  LOOKAHEAD( CastLookahead() ) CastExpression()
+  LOOKAHEAD( <LPAREN> Type() <RPAREN> ) CastExpression()
 |
   // postfix incr/decr
   PrimaryExpression() [ (t = <INCR> | t = <DECR>)
     { jjtThis.kind = t.kind; jjtThis.postfix = true; } #UnaryExpression(1) ]
-}
-
-// This production only looks ahead to see if the next matches a cast.
-void CastLookahead() : { }
-{
-  LOOKAHEAD(2) <LPAREN> PrimitiveType()
-|
-  LOOKAHEAD( <LPAREN> AmbiguousName() <LBRACKET> ) <LPAREN> AmbiguousName() <LBRACKET> <RBRACKET>
-|
- <LPAREN> AmbiguousName() <RPAREN> ( <TILDE> | <BANG> | <LPAREN> | <IDENTIFIER> | <NEW> | Literal() | ArrayDimensions() )
 }
 
 void CastExpression() #CastExpression :
@@ -976,9 +994,21 @@ void PrimaryExpression() #PrimaryExpression : { }
   PrimaryPrefix() ( PrimarySuffix() )*
 }
 
-void MethodInvocation() #MethodInvocation : { }
+void MethodInvocation() #MethodInvocation :
+{ Token t = null; }
 {
-   AmbiguousName() Arguments()
+  t=<IDENTIFIER> Arguments()
+  { jjtThis.methodName = t.image; }
+}
+
+void LambdaExpression() #LambdaExpression :
+{ Token t = null; }
+{
+  ( FormalParameters() | t=<IDENTIFIER> )
+  "->"
+  ( Block() | Expression() )
+  
+  { jjtThis.singleParamName = t != null ? t.image : null; }
 }
 
 void PrimaryPrefix() : { }
@@ -989,13 +1019,13 @@ void PrimaryPrefix() : { }
 |
   AllocationExpression()
 |
-  LOOKAHEAD( AmbiguousName() "(" ( Expression() | ")" ) )
+  LOOKAHEAD( <IDENTIFIER> "(" )
     MethodInvocation()
 |
   LOOKAHEAD( Type() "." "class" )
     Type()
 |
-  AmbiguousName()
+  NameNode()
 
 /*
 |
@@ -1018,6 +1048,11 @@ void PrimarySuffix() #PrimarySuffix :
       [ Expression() { jjtThis.hasRightIndex = true; } ]
      ( ":" { jjtThis.step = true; } [ Expression() ] )? )? "]" {
         jjtThis.operation = BSHPrimarySuffix.INDEX;
+    }
+|
+  "::" (t=<IDENTIFIER> | t="new") {
+      jjtThis.operation = BSHPrimarySuffix.METHOD_REF;
+      jjtThis.field = t.image;
     }
 |
     // Safe navigate field access or method invocation
@@ -1105,6 +1140,7 @@ void Literal() #Literal :
 |
   x = <LONG_STRING_LITERAL> {
         try {
+            // TODO: aqui n deveria ser jjtThis.stringSetup() ??
             jjtThis.value = x.image.substring(3, x.image.length() - 3);
         } catch ( Exception e ) {
             throw createParseException("Error parsing long string: "+x.image, e);
@@ -1119,7 +1155,8 @@ void Literal() #Literal :
 }
 |
  VoidLiteral() {
-    jjtThis.value = Primitive.VOID; }
+    jjtThis.value = Primitive.VOID;
+  }
 }
 
 boolean BooleanLiteral() :
