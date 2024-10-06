@@ -42,29 +42,29 @@ class BSHAssignment extends SimpleNode implements ParserConstants {
             return Primitive.NULL;
         }
 
-        BSHPrimaryExpression lhsNode =
-            (BSHPrimaryExpression) jjtGetChild(0);
+        BSHPrimaryExpression lhsNode = this.jjtGetChild(0);
 
         boolean strictJava = interpreter.getStrictJava();
-        LHS lhs = lhsNode.toLHS( callstack, interpreter);
+        LHS lhs = lhsNode.toLHS(callstack, interpreter);
 
         // For operator-assign operations save the lhs value before evaluating
         // the rhs.  This is correct Java behavior for postfix operations
         // e.g. i=1; i+=i++; // should be 2 not 3
         Object lhsValue = null;
-        if ( operator != ASSIGN ) try { // assign doesn't need the lhs value
-            lhsValue = lhs.getValue();
-        } catch ( UtilEvalError e ) {
-            throw e.toEvalError( this, callstack );
-        }
+        if (operator != ASSIGN)
+            try { // assign doesn't need the lhs value
+                lhsValue = lhs.getValue();
+            } catch ( UtilEvalError e ) {
+                throw e.toEvalError( this, callstack );
+            }
 
-        if ( operator == NULLCOALESCEASSIGN &&  Primitive.NULL != lhsValue )
+        if (operator == NULLCOALESCEASSIGN && Primitive.NULL != lhsValue)
             return lhsValue; // return non null lhs before evaluating rhs
 
         // evaluate the right hand side
         Object rhs = jjtGetChild(1).eval(callstack, interpreter);
 
-        if ( rhs == Primitive.VOID )
+        if (rhs == Primitive.VOID)
             throw new EvalException("illegal void assignment", this, callstack);
 
         try {

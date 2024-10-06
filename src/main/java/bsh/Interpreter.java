@@ -121,16 +121,17 @@ public class Interpreter
         staticInit();
     }
 
-    /** Shared system object visible under bsh.system */
-    private static final This SYSTEM_OBJECT = This.getThis(new NameSpace(null, null, "bsh.system"), null);
+    // TODO: verificar isso!
+    // /** Shared system object visible under bsh.system */
+    // private static final This SYSTEM_OBJECT = This.getThis(new NameSpace(null, null, "bsh.system"), null);
 
     /** Shared system object visible under bsh.system */
     public static void setShutdownOnExit(final boolean value) {
-        try {
-            SYSTEM_OBJECT.getNameSpace().setVariable("shutdownOnExit", Boolean.valueOf(value), false);
-        } catch (final UtilEvalError utilEvalError) {
-            throw new IllegalStateException(utilEvalError);
-        }
+        // try {
+        //     SYSTEM_OBJECT.getNameSpace().setVariable("shutdownOnExit", Boolean.valueOf(value), false);
+        // } catch (final UtilEvalError utilEvalError) {
+        //     throw new IllegalStateException(utilEvalError);
+        // }
     }
 
     /**
@@ -354,25 +355,26 @@ public class Interpreter
     /** Initialize the BeanShell root system objects and help system. */
     private void initRootSystemObject() {
         BshClassManager bcm = getClassManager();
-        // bsh
-        setu("bsh", new NameSpace(null, bcm, "Bsh Object" ).getThis( this ) );
+        // TODO: verificar isso!
+        // // bsh
+        // setu("bsh", new NameSpace(null, bcm, "Bsh Object" ).getThis( this ) );
 
-        // bsh.system
-        setu( "bsh.system", SYSTEM_OBJECT);
-        setu( "bsh.shared", SYSTEM_OBJECT); // alias
+        // // bsh.system
+        // setu( "bsh.system", SYSTEM_OBJECT);
+        // setu( "bsh.shared", SYSTEM_OBJECT); // alias
 
-        // bsh.help
-        This helpText = new NameSpace(null, bcm, "Bsh Command Help Text" ).getThis( this );
-        setu( "bsh.help", helpText );
+        // // bsh.help
+        // This helpText = new NameSpace(null, bcm, "Bsh Command Help Text" ).getThis( this );
+        // setu( "bsh.help", helpText );
 
-        // bsh.cwd
-        setu( "bsh.cwd", System.getProperty("user.dir") );
+        // // bsh.cwd
+        // setu( "bsh.cwd", System.getProperty("user.dir") );
 
-        // bsh.interactive
-        setu( "bsh.interactive", interactive ? Primitive.TRUE : Primitive.FALSE );
+        // // bsh.interactive
+        // setu( "bsh.interactive", interactive ? Primitive.TRUE : Primitive.FALSE );
 
-        // bsh.evalOnly
-        setu( "bsh.evalOnly", Primitive.FALSE );
+        // // bsh.evalOnly
+        // setu( "bsh.evalOnly", Primitive.FALSE );
     }
 
     /** Assign the global namespace for this interpreter.
@@ -459,12 +461,8 @@ public class Interpreter
      * @param clas with static main method.
      * @param args the string arguments.
      * @throws Exception thrown if something fails. */
-    public static void invokeMain(Class<?> clas, String[] args)
-            throws Exception {
-        Invocable main = Reflect.resolveJavaMethod(clas, "main",
-                new Class[] {String[].class}, true/*onlyStatic*/);
-        if ( null != main )
-            main.invoke(null, new Object[] {args});
+    public static void invokeMain(Class<?> clas, String[] args) throws Exception {
+        Reflect.invokeStaticMethod(clas, "method", new Object[] { args }, new CallStack());
     }
 
     /** Run interactively. (printing prompts, etc.) */
@@ -781,8 +779,9 @@ public class Interpreter
     public void reset() {
         this.getClassManager().reset();
         this.globalNameSpace.clear();
-        Name.clearParts();
-        Reflect.instanceCache.clear();
+        // TODO: verificar isso!
+        // Name.clearParts();
+        // Reflect.instanceCache.clear();
     }
 
     /**
@@ -914,11 +913,11 @@ public class Interpreter
         Unchecked set for internal use
     */
     void setu(String name, Object value) {
-        try {
-            set(name, value);
-        } catch ( EvalError e ) {
-            throw new InterpreterError("set: "+e, e);
-        }
+        // try {
+        //     set(name, value);
+        // } catch ( EvalError e ) {
+        //     throw new InterpreterError("set: "+e, e);
+        // }
     }
 
     public void set(String name, long value) throws EvalError {
@@ -1018,7 +1017,9 @@ public class Interpreter
     */
     public Object getInterface( Class<?> interf ) throws EvalError
     {
-        return globalNameSpace.getThis( this ).getInterface( interf );
+        // return globalNameSpace.getThis( this ).getInterface( interf );
+        // TODO: verificar isso!
+        throw new RuntimeException("Not implemented yet!");
     }
 
     /*  Methods for interacting with Parser */
@@ -1405,7 +1406,8 @@ public class Interpreter
     /** {@inheritDoc} */
     @Override
     public void classLoaderChanged() {
-        Reflect.instanceCache.clear();
+        // Reflect.instanceCache.clear();
+        // TODO: verificar isso!
     }
 
 }

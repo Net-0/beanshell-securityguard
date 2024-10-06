@@ -168,6 +168,8 @@ public class ClassManagerImpl extends BshClassManager
         final ClassLoader overlayLoader = getLoaderForClass( name );
         if ( overlayLoader != null ) {
             try {
+                System.out.println("ClassManagerImpl.classForName() -> name = " + name);
+                System.out.println("ClassManagerImpl.classForName() -> overlayLoader = " + overlayLoader);
                 c = overlayLoader.loadClass(name);
             } catch ( Exception e ) {
                 Interpreter.debug("overlay loader failed for '", "' - ", e);
@@ -405,48 +407,43 @@ public class ClassManagerImpl extends BshClassManager
         For this we use a DiscreteFilesClassLoader
     */
     @Override
-    public void reloadClasses( String [] classNames )
-        throws ClassPathException
-    {
+    public void reloadClasses(String[] classNames) throws ClassPathException {
         clearCaches();
 
         // validate that it is a class here?
 
         // init base class loader if there is none...
-        if ( baseLoader == null )
+        if (baseLoader == null)
             initBaseLoader();
 
-        DiscreteFilesClassLoader.ClassSourceMap map =
-            new DiscreteFilesClassLoader.ClassSourceMap();
+        DiscreteFilesClassLoader.ClassSourceMap map = new DiscreteFilesClassLoader.ClassSourceMap();
 
-        for (int i=0; i< classNames.length; i++) {
-            String name = classNames[i];
+        // for (int i=0; i< classNames.length; i++) {
+        //     String className = classNames[i];
+        for (String className: classNames) {
 
             // look in baseLoader class path
-            ClassSource classSource = baseClassPath.getClassSource( name );
+            ClassSource classSource = baseClassPath.getClassSource(className);
 
             // look in user class path
-            if ( classSource == null ) {
+            if (classSource == null) {
                 BshClassPath.getUserClassPath().insureInitialized();
-                classSource = BshClassPath.getUserClassPath().getClassSource(
-                    name );
+                classSource = BshClassPath.getUserClassPath().getClassSource(className);
             }
 
             // No point in checking boot class path, can't reload those.
             // else we could have used fullClassPath above.
 
-            if ( classSource == null )
-                throw new ClassPathException("Nothing known about class: "
-                    +name );
+            if (classSource == null)
+                throw new ClassPathException("Nothing known about class: " + className);
 
             // JarClassSource is not working... just need to implement it's
             // getCode() method or, if we decide to, allow the BshClassManager
             // to handle it... since it is a URLClassLoader and can handle JARs
-            if ( classSource instanceof JarClassSource )
-                throw new ClassPathException("Cannot reload class: "+name+
-                    " from source: "+ classSource );
+            if (classSource instanceof JarClassSource)
+                throw new ClassPathException("Cannot reload class: "+className+" from source: "+ classSource );
 
-            map.put( name, classSource );
+            map.put(className, classSource);
         }
 
         // Create classloader for the set of classes
@@ -454,7 +451,7 @@ public class ClassManagerImpl extends BshClassManager
 
         // map those classes the loader in the overlay map
         Iterator<String> it = map.keySet().iterator();
-        while ( it.hasNext() )
+        while (it.hasNext())
             loaderMap.put( it.next(), DiscreteFilesClassLoader.instance() );
         classLoaderChanged();
     }
@@ -466,22 +463,18 @@ public class ClassManagerImpl extends BshClassManager
         to unpackaged classes.
     */
     @Override
-    public void reloadPackage( String pack )
-        throws ClassPathException
-    {
-        Collection<String> classes =
-            baseClassPath.getClassesForPackage( pack );
+    public void reloadPackage(String pack) throws ClassPathException {
+        Collection<String> classes = baseClassPath.getClassesForPackage( pack );
 
-        if ( classes == null )
-            classes =
-                BshClassPath.getUserClassPath().getClassesForPackage( pack );
+        if (classes == null)
+            classes = BshClassPath.getUserClassPath().getClassesForPackage( pack );
 
         // no point in checking boot class path, can't reload those
 
         if ( classes == null )
             throw new ClassPathException("No classes found for package: "+pack);
 
-        reloadClasses( classes.toArray( new String[classes.size()] ) );
+        reloadClasses(classes.toArray(new String[classes.size()]));
     }
 
     /**
@@ -584,15 +577,14 @@ public class ClassManagerImpl extends BshClassManager
         @exception ClassPathException can be thrown by reloadClasses
     */
     @Override
-    public Class<?> defineClass( String name, byte [] code )
-    {
-        baseClassPath.setClassSource( name, new GeneratedClassSource( code ) );
+    public Class<?> defineClass(String name, byte [] code) {
+        baseClassPath.setClassSource(name, new GeneratedClassSource(code));
         try {
-             reloadClasses( new String [] { name } );
-        } catch ( ClassPathException e ) {
+            reloadClasses(new String[] { name });
+        } catch (ClassPathException e) {
             throw new bsh.InterpreterError("defineClass: "+e, e);
         }
-        return classForName( name );
+        return classForName(name);
     }
 
     /**
@@ -618,8 +610,7 @@ public class ClassManagerImpl extends BshClassManager
     }
 
     @Override
-    public void dump( PrintWriter i )
-    {
+    public void dump(PrintWriter i) {
         i.println("Bsh Class Manager Dump: ");
         i.println("----------------------- ");
         i.println("baseLoader = "+baseLoader);

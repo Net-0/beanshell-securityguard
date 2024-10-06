@@ -30,9 +30,9 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Map.Entry;
-import java.util.Objects;
 
 import bsh.Types.MapEntry;
+
 /**
     An LHS is a wrapper for an variable, field, or property.  It ordinarily
     holds the "left hand side" of an assignment and may be either resolved to
@@ -53,9 +53,8 @@ class LHS implements ParserConstants, Serializable {
     /** The assignment should be to a local variable */
     boolean localVar;
 
-    /**
-        Identifiers for the various types of LHS.
-    */
+    // TODO: verificar cada um desses!
+    /** Identifiers for the various types of LHS. */
     static final int
         VARIABLE = 0,
         FIELD = 1,
@@ -69,7 +68,7 @@ class LHS implements ParserConstants, Serializable {
 
     String varName;
     Object propName;
-    Invocable field;
+    // Invocable field;
     Object object;
     int index;
     Variable var;
@@ -80,53 +79,48 @@ class LHS implements ParserConstants, Serializable {
         definition in parent's scope is allowed. (e.g. the default case for
         undefined vars going to global).
     */
-    LHS( NameSpace nameSpace, String varName, boolean localVar )
-    {
+    LHS(NameSpace nameSpace, String varName, boolean localVar) {
         type = VARIABLE;
         this.localVar = localVar;
         this.varName = varName;
         this.nameSpace = nameSpace;
     }
 
-    LHS( NameSpace nameSpace, String varName )
-    {
+    LHS(NameSpace nameSpace, String varName) {
         type = LOOSETYPE_FIELD;
         this.varName = varName;
         this.nameSpace = nameSpace;
     }
 
-    /**
-        Static field LHS Constructor.
-        This simply calls Object field constructor with null object.
-    */
-    LHS( Invocable field )
-    {
-        type = FIELD;
-        this.object = field.getDeclaringClass();
-        this.field = field;
-        this.varName = field.getName();
-    }
+    // /**
+    //     Static field LHS Constructor.
+    //     This simply calls Object field constructor with null object.
+    // */
+    // LHS( Invocable field )
+    // {
+    //     type = FIELD;
+    //     this.object = field.getDeclaringClass();
+    //     this.field = field;
+    //     this.varName = field.getName();
+    // }
 
-    /**
-        Object field LHS Constructor.
-    */
-    LHS( Object object, Invocable field )
-    {
-        if ( object == null)
-            throw new NullPointerException("constructed empty LHS");
+    // /**
+    //     Object field LHS Constructor.
+    // */
+    // LHS( Object object, Invocable field )
+    // {
+    //     if ( object == null)
+    //         throw new NullPointerException("constructed empty LHS");
 
-        type = FIELD;
-        this.object = object;
-        this.field = field;
-        if (null != field)
-            this.varName = field.getName();
-    }
+    //     type = FIELD;
+    //     this.object = object;
+    //     this.field = field;
+    //     if (null != field)
+    //         this.varName = field.getName();
+    // }
 
-    /**
-        Object property LHS Constructor with Object property.
-    */
-    LHS( Object object, Object propName )
-    {
+    /** Object property LHS Constructor with Object property. */
+    LHS(Object object, Object propName) {
         if( object == null )
             throw new NullPointerException("constructed empty LHS");
 
@@ -138,50 +132,52 @@ class LHS implements ParserConstants, Serializable {
     /** Map Entry type LHS Constructor.
      * The provided key is returned along with its value as a Map.Entry
      * entity during assignment. */
-    LHS( Object key )
-    {
-        type = MAP_ENTRY;
+    LHS(Object key) {
+        type = MAP_ENTRY; // TODO: remover isso daqui!!!!!
         this.object = key;
     }
 
-    /**
-        Array index LHS Constructor.
-    */
-    LHS( Object array, int index )
-    {
+    // TODO: verificar isso
+    /** Array index LHS Constructor. */
+    LHS(Object array, int index) {
         type = INDEX;
         this.object = array;
         this.index = index;
     }
 
-    public Object getValue() throws UtilEvalError
-    {
-        if ( type == FIELD ) {
-            // Validate if can get this field
-            if (Reflect.isStatic(field))
-                Interpreter.mainSecurityGuard.canGetStaticField(field.getDeclaringClass(), field.getName());
-            else
-                Interpreter.mainSecurityGuard.canGetField(object, field.getName());
-        }
+    public Object getValue() throws UtilEvalError {
+        // TODO: ver isso
+        // if ( type == FIELD ) {
+        //     // Validate if can get this field
+        //     if (Reflect.isStatic(field))
+        //         Interpreter.mainSecurityGuard.canGetStaticField(field.getDeclaringClass(), field.getName());
+        //     else
+        //         Interpreter.mainSecurityGuard.canGetField(object, field.getName());
+        // }
 
         return this.getValueImpl();
     }
 
-    private Object getValueImpl() throws UtilEvalError
-    {
-        if ( type == VARIABLE )
-            return nameSpace.getVariableOrProperty( varName, null );
-
-        if ( type == FIELD ) try {
-            return Objects.requireNonNull(field,
-                "get value, field cannot be null").invoke(object);
-        } catch( ReflectiveOperationException e2 ) {
-            throw new UtilEvalError("Can't read field: " + field, e2);
+    private Object getValueImpl() throws UtilEvalError {
+        if ( type == VARIABLE ) {
+            // TODO: ver isso
+            throw new RuntimeException("Not implemented yet!");
+            // return nameSpace.getVariableOrProperty( varName, null );
         }
 
+        if ( type == FIELD )
+            // TODO: ver isso
+            throw new RuntimeException("Not implemented yet!");
+            // try {
+            //     return Objects.requireNonNull(field, "get value, field cannot be null").invokeImpl(object);
+            // } catch( ReflectiveOperationException e2 ) {
+            //     throw new UtilEvalError("Can't read field: " + field, e2);
+            // }
+
         if ( type == PROPERTY ) try {
-            return Reflect.getObjectProperty(object, this.propName);
-        } catch(ReflectError e) {
+            // TODO: verificar esse 'null'
+            return Reflect.getObjectProperty(object, this.propName, null);
+        } catch(ReflectError | TargetError e) {
             Interpreter.debug(e.getMessage());
             throw new UtilEvalError("No such property: " + propName, e);
         }
@@ -199,16 +195,18 @@ class LHS implements ParserConstants, Serializable {
     }
 
     public String getName() {
-        if ( null != field )
-            return field.getName();
+        // TODO: ver isso!
+        // if ( null != field )
+        //     return field.getName();
         if ( null != var )
             return var.getName();
         return varName;
     }
 
     public Class<?> getType() {
-        if ( null != field )
-            return field.getReturnType();
+        // TODO: ver isso
+        // if ( null != field )
+        //     return field.getReturnType();
         if ( null != getVariable() )
             return var.getType();
         try {
@@ -219,8 +217,9 @@ class LHS implements ParserConstants, Serializable {
     }
 
     public boolean isStatic() {
-        if ( null != field )
-            return field.isStatic();
+        // TODO: ver isso
+        // if ( null != field )
+        //     return field.isStatic();
         if ( null == this.var )
             return false;
         return var.hasModifier("static");
@@ -233,20 +232,23 @@ class LHS implements ParserConstants, Serializable {
     }
 
     public Variable getVariable() {
-        if ( null != var )
-            return this.var;
-        if ( null != nameSpace )
-            this.var = Reflect.getVariable(nameSpace, getName());
-        else if ( isStatic() )
-            if ( Reflect.isGeneratedClass(field.getDeclaringClass()) )
-                this.var = Reflect.getVariable(field.getDeclaringClass(), getName());
-            else
-                this.var = new Variable(field.getName(), field.getReturnType(), this);
-        else if ( Reflect.isGeneratedClass(object.getClass()) )
-            this.var = Reflect.getVariable(object, getName());
-        else if ( null != field )
-            this.var = new Variable(field.getName(), field.getReturnType(), this);
-        return this.var;
+        // TODO: ver isso
+        throw new RuntimeException("Not implemented yet!");
+
+        // if ( null != var )
+        //     return this.var;
+        // if ( null != nameSpace )
+        //     this.var = Reflect.getVariable(nameSpace, getName());
+        // else if ( isStatic() )
+        //     if ( Reflect.isGeneratedClass(field.getDeclaringClass()) )
+        //         this.var = Reflect.getVariable(field.getDeclaringClass(), getName());
+        //     else
+        //         this.var = new Variable(field.getName(), field.getReturnType(), this);
+        // else if ( Reflect.isGeneratedClass(object.getClass()) )
+        //     this.var = Reflect.getVariable(object, getName());
+        // else if ( null != field )
+        //     this.var = new Variable(field.getName(), field.getReturnType(), this);
+        // return this.var;
     }
 
 
@@ -262,33 +264,32 @@ class LHS implements ParserConstants, Serializable {
     /**
         Assign a value to the LHS.
     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public Object assign( Object val, boolean strictJava )
-        throws UtilEvalError
-    {
-        if ( type == VARIABLE )
-        {
+    public Object assign( Object val, boolean strictJava ) throws UtilEvalError {
+        if ( type == VARIABLE ) {
             // Set the variable in namespace according to localVar flag
             if ( localVar )
                 nameSpace.setLocalVariableOrProperty( varName, val, strictJava );
             else
                 nameSpace.setVariableOrProperty( varName, val, strictJava );
             return getValueImpl();
-        } else  if ( type == FIELD )  try {
-            Objects.requireNonNull(field,
-                "assign value, field cannot be null").invoke( object, val);
-            return getValueImpl();
-        } catch (ReflectiveOperationException e) {
-            throw new UtilEvalError(
-                "LHS ("+field.getName()+") can't access field: "+e, e);
-        } else if ( type == PROPERTY ) try {
-            if (propName instanceof String)
-                return  Reflect.setObjectProperty(object, (String) propName, val);
-            return  Reflect.setObjectProperty(object, propName, val);
-        } catch(ReflectError e) {
-            Interpreter.debug("Assignment: " + e.getMessage());
-            throw new UtilEvalError("No such property: " + propName, e);
-        }
+        } else if ( type == FIELD )
+            // TODO: ver isso
+            throw new RuntimeException("Not implemented yet!");
+            // try {
+            //     Objects.requireNonNull(field, "assign value, field cannot be null").invokeImpl( object, val);
+            //     return getValueImpl();
+            // } catch (ReflectiveOperationException e) {
+            //     throw new UtilEvalError("LHS ("+field.getName()+") can't access field: "+e, e);
+            // }
+        else if ( type == PROPERTY )
+            try {
+                if (propName instanceof String)
+                    return  Reflect.setObjectProperty(object, (String) propName, val);
+                return  Reflect.setObjectProperty(object, propName, val);
+            } catch(ReflectError e) {
+                Interpreter.debug("Assignment: " + e.getMessage());
+                throw new UtilEvalError("No such property: " + propName, e);
+            }
         else if ( type == INDEX ) try {
             if ( object.getClass().isArray() && val != null ) try {
                 val = Types.castObject( val,
@@ -322,7 +323,7 @@ class LHS implements ParserConstants, Serializable {
 
     public String toString() {
         return "LHS: "
-            +((field!=null)? "field = "+field.toString():"")
+            // +((field!=null)? "field = "+field.toString():"") // TODO: ver isso!
             +(varName!=null ? " varName = "+varName: "")
             +(nameSpace!=null ? " nameSpace = "+nameSpace.toString(): "");
     }
@@ -331,12 +332,13 @@ class LHS implements ParserConstants, Serializable {
      * @param s serializer
      * @throws IOException mandatory throwing exception */
     private synchronized void writeObject(final ObjectOutputStream s) throws IOException {
-        if ( null != field ) {
-            this.object = field.getDeclaringClass();
-            this.varName = field.getName();
-            this.field = null;
-        }
-        s.defaultWriteObject();
+        // TODO: ver isso
+        // if ( null != field ) {
+        //     this.object = field.getDeclaringClass();
+        //     this.varName = field.getName();
+        //     this.field = null;
+        // }
+        // s.defaultWriteObject();
     }
 
     /** Fetch field removed from serializer.
@@ -349,8 +351,9 @@ class LHS implements ParserConstants, Serializable {
             return;
         Class<?> cls = this.object.getClass();
         if ( this.object instanceof Class )
-            cls = (Class<?>) this.object;
-        this.field = BshClassManager.memberCache.get(cls).findField(varName);
+            cls = (Class<?>) this.object; // TODO: ver a questão dos getter e setter criados ( desativar para strictJava )
+        // TODO: ver isso
+        // this.field = BshClassManager.memberCache.get(cls).findField(varName);
     }
 }
 

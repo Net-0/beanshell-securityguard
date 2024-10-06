@@ -28,6 +28,8 @@
 
 package bsh;
 
+import bsh.internals.BshLocalMethod;
+
 class BSHImportDeclaration extends SimpleNode
 {
     private static final long serialVersionUID = 1L;
@@ -56,9 +58,9 @@ class BSHImportDeclaration extends SimpleNode
                 } else {
                     Object obj = null;
                     Class<?> clas = null;
-                    String name = Name.suffix(ambigName.text, 1);
+                    String name = Name.suffix(ambigName.name, 1);
                     try { // import static method from class
-                        clas = namespace.getClass(Name.prefix(ambigName.text));
+                        clas = namespace.getClass(Name.prefix(ambigName.name));
                         obj = Reflect.staticMethodImport(clas, name);
                     } catch (Exception e) { /* ignore try field instead */ }
                     try { // import static field from class
@@ -70,8 +72,8 @@ class BSHImportDeclaration extends SimpleNode
                             obj = ambigName.toObject( callstack, interpreter );
                     } catch (Exception e) { /* ignore try field instead */ }
                     // do we have a method
-                    if ( obj instanceof BshMethod ) {
-                        namespace.setMethod( (BshMethod) obj );
+                    if ( obj instanceof BshLocalMethod ) {
+                        namespace.setMethod( (BshLocalMethod) obj );
                         return Primitive.VOID;
                     }
                     if ( !(obj instanceof LHS) )
@@ -83,12 +85,12 @@ class BSHImportDeclaration extends SimpleNode
                         return Primitive.VOID;
                     }
                     // no static member found
-                    throw new EvalException(ambigName.text
+                    throw new EvalException(ambigName.name
                                         + " is not a static member of a class",
                                         this, callstack );
                 }
             } else { // import package
-                String name = ambigName.text;
+                String name = ambigName.name;
                 if ( importPackage )
                     namespace.importPackage(name);
                 else

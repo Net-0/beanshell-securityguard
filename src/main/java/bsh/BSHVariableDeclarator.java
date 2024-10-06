@@ -28,6 +28,11 @@
 
 package bsh;
 
+import java.util.concurrent.Callable;
+
+import bsh.internals.BshField;
+import bsh.internals.BshModifier;
+
 /**
     name [ = initializer ]
     evaluate name and return optional initializer
@@ -88,12 +93,38 @@ class BSHVariableDeclarator extends SimpleNode
         return value;
     }
 
+    // TODO: this don't for this: String[] strs[] = { { "123" } };
     private int getArrayDims(BSHType typeNode) {
         if ( dimensions > 0 )
             return dimensions;
         if ( typeNode.getArrayDims() > 0 )
             return typeNode.getArrayDims();
         return -1;
+    }
+
+    // TODO: ver melhor a questão do BSHType, n deveria receber direto um java.lang.Type ?
+    protected BshField toField(BSHType typeNode, Modifiers mods, CallStack callstack, Interpreter interpreter) throws EvalError {
+        final int modifiers = mods.getModifiers() & BshModifier.FIELD_MODIFIERS;
+        Callable<?> initializer = null;
+        final Class<?> type = typeNode.getType(callstack, interpreter);
+
+        if ( jjtGetNumChildren() > 0 ) {
+            Node initializerNode = jjtGetChild(0);
+
+            initializer = () -> initializerNode.eval(callstack, interpreter);
+
+            if ( initializerNode instanceof BSHArrayInitializer ) {
+                BSHArrayInitializer bai = (BSHArrayInitializer) initializerNode;
+                Class<?> baseType = typeNode.getBaseType();
+                int dimensions = this.getArrayDims(typeNode);
+
+                initializer = () -> Primitive.unwrap(bai.eval(baseType, dimensions, callstack, interpreter));
+            } else
+                initializer = () -> Primitive.unwrap(initializerNode.eval( callstack, interpreter));
+        }
+
+        // TODO: impl the logic to get the right genericType
+        return new BshField(modifiers, type, name, initializer);
     }
 
     @Override

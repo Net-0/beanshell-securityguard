@@ -4,13 +4,15 @@ import java.io.PrintStream;
 import java.io.StringReader;
 import java.util.Map;
 
+import bsh.internals.BshLocalMethod;
+
 /** With this class the script source is only parsed once and the resulting
  * AST is used for {@link #invoke(java.util.Map) every invocation}. This class
  * is designed to be thread-safe. */
 public class PreparsedScript {
 
     /** Prepared script reference. */
-    private final BshMethod prepared;
+    private final BshLocalMethod prepared;
     /** Local interpreter reference. */
     private final Interpreter interpreter;
 
@@ -30,18 +32,12 @@ public class PreparsedScript {
     public PreparsedScript(final String source, final ClassLoader classLoader) throws EvalError {
         interpreter = new Interpreter();
         interpreter.setClassLoader(classLoader);
-        try {
-            final This callable = (This) interpreter.eval(new StringReader(
-                    "__execute() {"
-                    + interpreter.terminatedScript(source)
-                    + "} return this;"),
-                interpreter.globalNameSpace,
-                interpreter.showEvalString("pre-parsed script", source));
-            prepared = callable.getNameSpace()
-                        .getMethod("__execute", Reflect.ZERO_TYPES, false);
-        } catch (final UtilEvalError e) {
-            throw new IllegalStateException(e);
-        }
+
+        final String sourceFileInfo = interpreter.showEvalString("pre-parsed script", source);
+        final String script = "__execute() {" + interpreter.terminatedScript(source) + "} return this;";
+
+        final This callable = (This) interpreter.eval(new StringReader(script), interpreter.globalNameSpace, sourceFileInfo);
+        prepared = callable.namespace.getMethod("__execute", Reflect.ZERO_TYPES);
     }
 
     /** Find the default system class loader.
@@ -64,16 +60,16 @@ public class PreparsedScript {
      * @return of the script execution
      * @throws EvalError thrown on script error.*/
     public Object invoke(final Map<String,?> context) throws EvalError {
-        final NameSpace scope = new NameSpace(interpreter.globalNameSpace,
-                interpreter.getClassManager(), "BeanshellExecutable");
+        final NameSpace scope = new NameSpace(interpreter.globalNameSpace, interpreter.getClassManager(), "BeanshellExecutable");
         scope.isMethod = true;
         final Interpreter local = new Interpreter(scope, interpreter);
 
         for ( final Map.Entry<String,?> entry : context.entrySet() )
             local.set(entry.getKey(), entry.getValue());
 
-        return Primitive.unwrap(prepared.invoke(Reflect.ZERO_ARGS,
-                local, new CallStack(scope), Node.JAVACODE, true));
+        Object result = prepared.invoke(new CallStack(scope), Reflect.ZERO_ARGS);
+        return Primitive.unwrap(result);
+        // return Primitive.unwrap(prepared.invoke(Reflect.ZERO_ARGS, local, new CallStack(scope), Node.JAVACODE, true));
     }
 
     /** Attach a standard output stream.

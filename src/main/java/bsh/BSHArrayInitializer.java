@@ -25,10 +25,10 @@
  *****************************************************************************/
 package bsh;
 
+import java.lang.reflect.Array;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Map;
-import java.lang.reflect.Array;
 
 import bsh.Types.MapEntry;
 
@@ -199,10 +199,11 @@ class BSHArrayInitializer extends SimpleNode {
             CallStack callstack, Interpreter interpreter) throws EvalError {
         callstack.push(new NameSpace(callstack.top(), baseType.getName()));
         callstack.top().setClassStatic(baseType);
-        callstack.top().getThis(interpreter);
+        // callstack.top().getThis(interpreter); // TODO: see it!
+
         try {
             Object bean = baseType.getConstructor().newInstance();
-            callstack.top().setClassInstance(bean);
+            // callstack.top().setClassInstance(bean); // TODO: ver isso!
             for (int i = 0; i < jjtGetNumChildren(); i++) {
                 BSHAssignment asNode = (BSHAssignment)this.jjtGetChild(i);
                 BSHPrimaryExpression peNode = (BSHPrimaryExpression)asNode.jjtGetChild(0);

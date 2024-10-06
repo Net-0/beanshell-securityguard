@@ -28,16 +28,13 @@
 
 package bsh;
 
-class BSHReturnStatement extends SimpleNode implements ParserConstants
-{
+class BSHReturnStatement extends SimpleNode implements ParserConstants {
     public int kind;
     public String label;
 
     BSHReturnStatement(int id) { super(id); }
 
-    public Object eval(CallStack callstack, Interpreter interpreter)
-        throws EvalError
-    {
+    public Object eval(CallStack callstack, Interpreter interpreter) throws EvalError {
         if (null != label)
             return new ReturnControl(kind, label, this);
         Object value;

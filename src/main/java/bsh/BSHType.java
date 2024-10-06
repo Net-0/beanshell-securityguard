@@ -30,6 +30,7 @@ package bsh;
 
 import java.lang.reflect.Array;
 
+// TODO: implementar suporte à generics, wildcards, etc...
 class BSHType extends SimpleNode implements BshClassManager.Listener {
     private static final long serialVersionUID = 1L;
     /**
@@ -87,22 +88,23 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
         String descriptor;
         //  first node will either be PrimitiveType or AmbiguousName
         Node node = getTypeNode();
-        if ( node instanceof BSHPrimitiveType )
-            descriptor = getTypeDescriptor( ((BSHPrimitiveType)node).type );
-        else
-        {
-            String clasName = ((BSHAmbiguousName)node).text;
+        if (node instanceof BSHPrimitiveType)
+            descriptor = getTypeDescriptor(((BSHPrimitiveType) node).type);
+        else {
+            final BSHName nameNode = this.jjtGetChild(0);
+            String clasName = nameNode.name;
             String innerClass = callstack.top().importedClasses.get(clasName);
 
             Class<?> clas = null;
-            if ( innerClass == null ) try {
-                clas = ((BSHAmbiguousName)node).toClass(
-                    callstack, interpreter );
-            } catch ( EvalError e ) {
-                // Lets assume we have a generics raw type
-                if (clasName.length() == 1)
-                    clasName = "java.lang.Object";
-            } else
+            if ( innerClass == null )
+                try {
+                    clas = nameNode.toClass(callstack, interpreter);
+                } catch ( EvalError e ) {
+                    // Lets assume we have a generics raw type
+                    if (clasName.length() == 1)
+                        clasName = "java.lang.Object";
+                }
+            else
                 clasName = innerClass.replace('.', '$');
 
             if ( clas != null ) {
@@ -111,8 +113,7 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
                 if ( defaultPackage == null || Name.isCompound( clasName ) )
                     descriptor = "L" + clasName.replace('.','/') + ";";
                 else
-                    descriptor =
-                        "L"+defaultPackage.replace('.','/')+"/"+clasName + ";";
+                    descriptor = "L"+defaultPackage.replace('.','/')+"/"+clasName + ";";
             }
         }
 
@@ -136,12 +137,10 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
             baseType = ((BSHPrimitiveType)node).getType();
         else
             try {
-            baseType = ((BSHAmbiguousName)node).toClass(
-                callstack, interpreter );
+                baseType = ((BSHName)node).toClass(callstack, interpreter);
             } catch (EvalError e) {
                 // Assuming generics raw type
-                if (node.getText().trim().length() == 1
-                        && e.getCause() instanceof ClassNotFoundException)
+                if (node.getText().trim().length() == 1 && e.getCause() instanceof ClassNotFoundException)
                     baseType = Object.class;
                 else
                     throw e; // roll up unhandled error
@@ -193,6 +192,7 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
         baseType = null;
     }
 
+    // TODO: remover esse método!
     public static String getTypeDescriptor( Class<?> clas )
     {
         if ( clas == Boolean.TYPE ) return "Z";

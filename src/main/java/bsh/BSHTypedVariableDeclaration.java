@@ -27,6 +27,8 @@
 
 package bsh;
 
+import bsh.internals.BshField;
+
 class BSHTypedVariableDeclaration extends SimpleNode {
     private static final long serialVersionUID = 1L;
     public Modifiers modifiers = new Modifiers(Modifiers.FIELD);
@@ -45,7 +47,7 @@ class BSHTypedVariableDeclaration extends SimpleNode {
         return typeNode.getType( callstack, interpreter );
     }
 
-    BSHVariableDeclarator [] getDeclarators()
+    BSHVariableDeclarator[] getDeclarators()
     {
         if (null != bvda)
             return bvda;
@@ -82,23 +84,27 @@ class BSHTypedVariableDeclaration extends SimpleNode {
                 value = dec.eval( typeNode, modifiers, callstack, interpreter);
                 try {
                     LHS lhs = null;
-                    if ( namespace.isClass )
-                        if ( null != namespace.classInstance )
-                            lhs = new LHS(namespace.classInstance,
-                                Reflect.resolveJavaField(
-                                    namespace.classStatic,
-                                dec.name, modifiers.hasModifier("static")));
-                        else
-                            lhs = new LHS(namespace.classStatic,
-                                Reflect.resolveJavaField(namespace.classStatic,
-                                dec.name, modifiers.hasModifier("static")));
+                    if ( namespace.isClass ) {
+                        // TODO: see it!
+                        throw new RuntimeException("Not implemented yet!");
+                    }
+                        // if ( null != namespace.classInstance )
+                        //     lhs = new LHS(namespace.classInstance,
+                        //         Reflect.resolveJavaField(
+                        //             namespace.classStatic,
+                        //         dec.name, modifiers.hasModifier("static")));
+                        // else
+                        //     lhs = new LHS(namespace.classStatic,
+                        //         Reflect.resolveJavaField(namespace.classStatic,
+                        //         dec.name, modifiers.hasModifier("static")));
 
-                    if ( null != lhs && null != lhs.field ) {
-                        Variable var = new Variable(dec.name, type, lhs);
-                        var.modifiers = modifiers;
-                        var.setValue(value, Variable.ASSIGNMENT);
-                        namespace.setVariableImpl(var);
-                    } else {
+                    // TODO: see it!
+                    // if ( null != lhs && null != lhs.field ) {
+                    //     Variable var = new Variable(dec.name, type, lhs);
+                    //     var.modifiers = modifiers;
+                    //     var.setValue(value, Variable.ASSIGNMENT);
+                    //     namespace.setVariableImpl(var);
+                    // } else {
                         if (interpreter.getStrictJava()
                                 && value instanceof Primitive
                                 && ((Primitive) value).isNumber())
@@ -109,7 +115,7 @@ class BSHTypedVariableDeclaration extends SimpleNode {
                         if (!namespace.isMethod)
                             interpreter.getClassManager().addListener(
                                 namespace.getVariableImpl(dec.name, false));
-                    }
+                    // }
                     if (!namespace.isClass)
                         value = namespace.getVariable(dec.name);
                 } catch ( UtilEvalError e ) {
@@ -120,6 +126,15 @@ class BSHTypedVariableDeclaration extends SimpleNode {
             throw e.reThrow( "Typed variable declaration" );
         }
         return value;
+    }
+
+    protected BshField[] toFields(CallStack callstack, Interpreter interpreter) throws EvalError {
+        BSHVariableDeclarator[] variables = this.getDeclarators();
+        BshField[] fields = new BshField[variables.length];
+        BSHType typeNode = this.getTypeNode();
+        for (int i = 0; i < variables.length; i++)
+            fields[i] = variables[i].toField(typeNode, modifiers, callstack, interpreter);
+        return fields;
     }
 
     public String toString() {

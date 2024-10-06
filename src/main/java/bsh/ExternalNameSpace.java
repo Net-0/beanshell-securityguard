@@ -119,8 +119,6 @@ public class ExternalNameSpace extends NameSpace
         externalMap.remove( name );
     }
 
-    /**
-    */
     public String [] getVariableNames()
     {
         return Stream.concat(
@@ -129,8 +127,6 @@ public class ExternalNameSpace extends NameSpace
             ).toArray(String[]::new);
     }
 
-    /**
-    */
     /*
         Notes: This implementation of getVariableImpl handles the following
         cases:
@@ -181,9 +177,7 @@ public class ExternalNameSpace extends NameSpace
         return var;
     }
 
-    public Variable createVariable(
-        String name, Class type, Object value, Modifiers mods )
-    {
+    public Variable createVariable(String name, Class<?> type, Object value, Modifiers mods) {
         LHS lhs = new LHS( externalMap, name );
         // Is this race condition worth worrying about?
         // value will appear in map before it's really in the interpreter
@@ -199,8 +193,7 @@ public class ExternalNameSpace extends NameSpace
         Clear all variables, methods, and imports from this namespace and clear
         all values from the external map (via Map clear()).
     */
-    public void clear()
-    {
+    public void clear() {
         super.clear();
         externalMap.clear();
     }

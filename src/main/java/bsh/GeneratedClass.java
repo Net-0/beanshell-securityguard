@@ -23,6 +23,7 @@
  *****************************************************************************/
 package bsh;
 
+// TODO: remover isso!
 /** Marker interface for generated classes */
 public interface GeneratedClass {
 

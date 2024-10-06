@@ -29,6 +29,7 @@ package bsh;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import bsh.internals.BshLocalMethod;
 import bsh.util.ReferenceCache;
 import bsh.util.ReferenceCache.Type;
 
@@ -157,33 +158,34 @@ class BlockNameSpace extends NameSpace
         } catch ( UtilEvalError e ) { return false; }
     }
 
-    /** do we need this? */
-    private NameSpace getNonBlockParent()
-    {
-        NameSpace parent = super.getParent();
-        if ( parent instanceof BlockNameSpace )
-            return ((BlockNameSpace)parent).getNonBlockParent();
-        else
-            return parent;
-    }
+    // /** do we need this? */
+    // private NameSpace getNonBlockParent()
+    // {
+    //     NameSpace parent = super.getParent();
+    //     if ( parent instanceof BlockNameSpace )
+    //         return ((BlockNameSpace)parent).getNonBlockParent();
+    //     else
+    //         return parent;
+    // }
 
-    /**
-        Get a 'this' reference is our parent's 'this' for the object closure.
-        e.g. Normally a 'this' reference to a BlockNameSpace (e.g. if () { } )
-        resolves to the parent namespace (e.g. the namespace containing the
-        "if" statement).
-        @see #getBlockThis( Interpreter )
-    */
-    public This getThis( Interpreter declaringInterpreter ) {
-        return getNonBlockParent().getThis( declaringInterpreter );
-    }
+    // /**
+    //     Get a 'this' reference is our parent's 'this' for the object closure.
+    //     e.g. Normally a 'this' reference to a BlockNameSpace (e.g. if () { } )
+    //     resolves to the parent namespace (e.g. the namespace containing the
+    //     "if" statement).
+    //     @see #getBlockThis( Interpreter )
+    // */
+    // public This getThis( Interpreter declaringInterpreter ) {
+    //     return getNonBlockParent().getThis( declaringInterpreter );
+    // }
 
-    /**
-        super is our parent's super
-    */
-    public This getSuper( Interpreter declaringInterpreter ) {
-        return getNonBlockParent().getSuper( declaringInterpreter );
-    }
+    // // TODO: see it
+    // /**
+    //     super is our parent's super
+    // */
+    // public This getSuper( Interpreter declaringInterpreter ) {
+    //     return getNonBlockParent().getSuper( declaringInterpreter );
+    // }
 
     /**
         delegate import to our parent
@@ -199,7 +201,7 @@ class BlockNameSpace extends NameSpace
         getParent().importPackage( name );
     }
 
-    public void setMethod(BshMethod method) {
+    public void setMethod(BshLocalMethod method) {
         getParent().setMethod( method );
     }
 }
