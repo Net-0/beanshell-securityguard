@@ -27,52 +27,47 @@
 
 package bsh;
 
-class BSHAmbiguousName extends SimpleNode
-{
-    public String text;
+class BSHAmbiguousName extends SimpleNode {
+    public String name;
 
     BSHAmbiguousName(int id) { super(id); }
 
-    public Name getName( NameSpace namespace )
-    {
-        return namespace.getNameResolver( text );
+    public Name getName(NameSpace namespace) { // TODO: faz + sentido termos o 'Name' pois isso seria cache ( + performático ) ?
+        return namespace.getNameResolver( name );
     }
 
-    public Object toObject( CallStack callstack, Interpreter interpreter )
-        throws EvalError
-    {
-        return toObject( callstack, interpreter, false );
-    }
-
-    Object toObject(
-        CallStack callstack, Interpreter interpreter, boolean forceClass )
-        throws EvalError
-    {
+    // TODO: precisamos criar uma instância de bsh.Name para isso ??
+    //  - Note: temos o BSHName e o BSHAmbiguousName, cada um não pode tratar sua lógica por si só ?
+    public Object toObject(CallStack callstack, Interpreter interpreter) throws EvalError {
         try {
-            return
-                getName( callstack.top() ).toObject(
-                    callstack, interpreter, forceClass );
+            return getName(callstack.top()).toObject(callstack, interpreter);
         } catch ( UtilEvalError e ) {
             throw e.toEvalError( this, callstack );
         }
     }
 
-    public Class<?> toClass( CallStack callstack, Interpreter interpreter )
-        throws EvalError
-    {
+    // Object toObject(CallStack callstack, Interpreter interpreter, boolean forceClass) throws EvalError {
+    //     // TODO: ver isso
+    //     throw new RuntimeException("Not implemented yet!");
+    //     // try {
+    //     //     // return getName( callstack.top() ).toObject( callstack, interpreter, forceClass );
+    //     // } catch ( UtilEvalError e ) {
+    //     //     throw e.toEvalError( this, callstack );
+    //     // }
+    // }
+
+    // TODO: ainda precisamos disso ? agr temos o BSHName
+    // TODO: remover esse método ? o nome 'toClass' não faz sentido e vale lembrar que a implementação é no Name.toClass()!
+    public Class<?> toClass(CallStack callstack, Interpreter interpreter) throws EvalError {
         try {
             return getName( callstack.top() ).toClass();
         } catch ( ClassNotFoundException e ) {
             throw new EvalException( e.getMessage(), this, callstack, e );
-        } catch ( UtilEvalError e2 ) {
-            // ClassPathException is a type of UtilEvalError
-            throw e2.toEvalError( this, callstack );
         }
     }
 
-    public LHS toLHS( CallStack callstack, Interpreter interpreter)
-        throws EvalError
-    {
+    // TODO: remover isso, um set ambiguous name pode ser resolvido simplesmente dando um .substring() e removendo a última parte do ambiguousName e dando um Reflect.setField()!!!!
+    public LHS toLHS(CallStack callstack, Interpreter interpreter) throws EvalError {
         try {
             return getName( callstack.top() ).toLHS( callstack, interpreter );
         } catch ( UtilEvalError e ) {
@@ -80,20 +75,18 @@ class BSHAmbiguousName extends SimpleNode
         }
     }
 
+    // TODO: mudar a descrição, BSHAmbiguousName não é um node executável, é uma expressão à ser resolvida e usada!
     /*
         The interpretation of an ambiguous name is context sensitive.
         We disallow a generic eval( ).
     */
-    public Object eval( CallStack callstack, Interpreter interpreter )
-        throws EvalError
-    {
-        throw new InterpreterError(
-            "Don't know how to eval an ambiguous name!"
-            +"  Use toObject() if you want an object." );
+    public Object eval(CallStack callstack, Interpreter interpreter) throws EvalError {
+        // throw new InterpreterError("Don't know how to eval an ambiguous name! Use toObject() if you want an object." );
+        return this.toObject(callstack, interpreter);
     }
 
     public String toString() {
-        return super.toString() + ": " + text;
+        return super.toString() + ": " + name;
     }
 }
 

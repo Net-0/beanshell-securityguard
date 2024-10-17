@@ -156,7 +156,7 @@ class BSHBinaryExpression extends SimpleNode implements ParserConstants {
                 && (nameNode = jjtGetChild(index).jjtGetChild(0))
                     instanceof BSHAmbiguousName )
             return callstack.top().getVariableImpl(
-                    ((BSHAmbiguousName) nameNode).text, true);
+                    ((BSHAmbiguousName) nameNode).name, true);
         return null;
     }
 

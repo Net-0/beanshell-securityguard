@@ -25,10 +25,10 @@
  *****************************************************************************/
 package bsh;
 
+import java.lang.reflect.Array;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Map;
-import java.lang.reflect.Array;
 
 import bsh.Types.MapEntry;
 
@@ -56,10 +56,8 @@ class BSHArrayInitializer extends SimpleNode {
     /** Default node eval is disabled for this node type.
      * {@inheritDoc} */
     @Override
-    public Object eval( CallStack callstack, Interpreter interpreter )
-        throws EvalError {
-        throw new EvalError( "Array initializer has no base type.",
-            this, callstack );
+    public Object eval(CallStack callstack, Interpreter interpreter) throws EvalError {
+        throw new EvalError("Array initializer has no base type.", this, callstack);
     }
 
     /** Construct the array from the initializer syntax.
@@ -70,8 +68,7 @@ class BSHArrayInitializer extends SimpleNode {
      * @param interpreter default eval interpreter
      * @return array initializer
      * @throws EvalError produced by thrown type errors */
-    public Object eval( Class<?> baseType, int dimensions, CallStack callstack,
-            Interpreter interpreter ) throws EvalError {
+    public Object eval(Class<?> baseType, int dimensions, CallStack callstack, Interpreter interpreter) throws EvalError {
         if ( 0 == jjtGetNumChildren() )
             dimensions = 0;
 
@@ -195,14 +192,14 @@ class BSHArrayInitializer extends SimpleNode {
      * @param interpreter default eval interpreter
      * @return an evaluated bean with properties set
      * @throws EvalError produced by thrown type errors */
-    private Object buildBean(Class<?> baseType,
-            CallStack callstack, Interpreter interpreter) throws EvalError {
+    private Object buildBean(Class<?> baseType, CallStack callstack, Interpreter interpreter) throws EvalError {
         callstack.push(new NameSpace(callstack.top(), baseType.getName()));
-        callstack.top().setClassStatic(baseType);
-        callstack.top().getThis(interpreter);
+        // callstack.top().setClassStatic(baseType); // TODO: see it
+        // callstack.top().getThis(interpreter); // TODO: see it!
+
         try {
             Object bean = baseType.getConstructor().newInstance();
-            callstack.top().setClassInstance(bean);
+            // callstack.top().setClassInstance(bean); // TODO: ver isso!
             for (int i = 0; i < jjtGetNumChildren(); i++) {
                 BSHAssignment asNode = (BSHAssignment)this.jjtGetChild(i);
                 BSHPrimaryExpression peNode = (BSHPrimaryExpression)asNode.jjtGetChild(0);

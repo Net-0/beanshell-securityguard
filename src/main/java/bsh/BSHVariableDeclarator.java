@@ -28,6 +28,12 @@
 
 package bsh;
 
+import java.util.concurrent.Callable;
+
+import bsh.internals.BshConsumer;
+import bsh.internals.BshField;
+import bsh.internals.BshModifier;
+
 /**
     name [ = initializer ]
     evaluate name and return optional initializer
@@ -54,20 +60,21 @@ class BSHVariableDeclarator extends SimpleNode
             int [] a = { 1, 2 };
         typeNode may be null to indicate no type information available.
     */
-    public Object eval(
-        BSHType typeNode, Modifiers modifiers, CallStack callstack, Interpreter interpreter)
-        throws EvalError
-    {
+    public Object eval(BSHType typeNode, Modifiers modifiers, CallStack callStack, Interpreter interpreter) throws EvalError {
         // null value means no value
-        Object value = modifiers.hasModifier("final")
-                ? null
-                : Primitive.isWrapperType(typeNode.getBaseType())
-                    ? null
-                    : Primitive.getDefaultValue(typeNode.getBaseType());
+        // Object value = modifiers.hasModifier("final")
+        //         ? null
+        //         : Primitive.isWrapperType(typeNode.getBaseType())
+        //             ? null
+        //             : Primitive.getDefaultValue(typeNode.getBaseType());
 
-        if ( jjtGetNumChildren() > 0 )
-        {
-            Node initializer = jjtGetChild(0);
+        // Object value = Primitive.isWrapperType(typeNode.getBaseType()) ? null : Primitive.getDefaultValue(typeNode.getBaseType());
+
+        if (this.jjtGetNumChildren() == 0)
+            return Primitive.isWrapperType(typeNode.getBaseType()) ? null : Primitive.getDefaultValue(typeNode.getBaseType());
+
+        // if (this.jjtGetNumChildren() > 0) {
+            final Node initializer = this.jjtGetChild(0);
 
             /*
                 If we have type info and the child is an array initializer
@@ -75,19 +82,21 @@ class BSHVariableDeclarator extends SimpleNode
                 (This allows array initializer to handle the problem...
                 allowing for future enhancements in loosening types there).
             */
-            if ( initializer instanceof BSHArrayInitializer )
-                value = ((BSHArrayInitializer)initializer).eval(typeNode.getBaseType(),
-                    this.getArrayDims(typeNode), callstack, interpreter);
-            else
-                value = initializer.eval( callstack, interpreter);
-        }
+            if (initializer instanceof BSHArrayInitializer) {
+                final BSHArrayInitializer arrayInitializer = (BSHArrayInitializer) initializer;
+                return arrayInitializer.eval(typeNode.getBaseType(), this.getArrayDims(typeNode), callStack, interpreter);
+            }
+            // else
+            return initializer.eval(callStack, interpreter);
+        // }
 
-        if ( value == Primitive.VOID )
-            throw new EvalException("Void initializer.", this, callstack );
+        // if ( value == Primitive.VOID )
+        //     throw new EvalException("Void initializer.", this, callstack );
 
-        return value;
+        // return value;
     }
 
+    // TODO: this don't for this: String[] strs[] = { { "123" } };
     private int getArrayDims(BSHType typeNode) {
         if ( dimensions > 0 )
             return dimensions;
@@ -95,6 +104,56 @@ class BSHVariableDeclarator extends SimpleNode
             return typeNode.getArrayDims();
         return -1;
     }
+
+    // protected final boolean hasInitializer() {
+    //     return this.jjtGetNumChildren() > 0;
+    // }
+
+    // protected final Object evalInitializer(BSHType typeNode, CallStack callStack, Interpreter interpreter) throws EvalError {
+    //     final Node initializerNode = this.jjtGetChild(0);
+
+    //     if (initializerNode instanceof BSHArrayInitializer) {
+    //         BSHArrayInitializer bai = (BSHArrayInitializer) initializerNode;
+    //         Class<?> baseType = typeNode.getBaseType();
+    //         int dimensions = this.getArrayDims(typeNode);
+
+    //         return Primitive.unwrap(bai.eval(baseType, dimensions, callStack, interpreter));
+    //     }
+
+    //     return Primitive.unwrap(initializerNode.eval( callStack, interpreter));
+    // }
+
+    // TODO: ver melhor a questão do BSHType, n deveria receber direto um java.lang.Type ?
+    protected BshField toField(BSHType typeNode, Modifiers mods, CallStack callstack, Interpreter interpreter) throws EvalError {
+        final int modifiers = mods.getModifiers() & BshModifier.FIELD_MODIFIERS;
+        final Class<?> type = typeNode.getType(callstack, interpreter);
+        // TODO: impl the logic to get the right genericType
+        return new BshField(modifiers, type, name);
+    }
+
+    // protected BshConsumer<CallStack> toStaticInitializer(Interpreter interpreter) {
+    //     return (callStack) -> {
+    //         final Class<?> _class = callStack.top().declaringClass.toClass();
+    //         final Object value = this.eval(callStack, interpreter);
+    //         try {
+    //             Reflect.setStaticField(_class, name, value, callStack);
+    //         } catch (UtilEvalError e) {
+    //             throw e.toEvalError(this, callStack);
+    //         } catch (NoSuchFieldException e) {}
+    //     };
+    // }
+
+    // protected BshConsumer<CallStack> toInitializer(Interpreter interpreter) {
+    //     return (callStack) -> {
+    //         final This _this = callStack.top()._this;
+    //         final Object value = this.eval(callStack, interpreter);
+    //         try {
+    //             Reflect.setField(_this, name, value, callStack);
+    //         } catch (UtilEvalError e) {
+    //             throw e.toEvalError(this, callStack);
+    //         } catch (NoSuchFieldException e) {}
+    //     };
+    // }
 
     @Override
     public String toString() {

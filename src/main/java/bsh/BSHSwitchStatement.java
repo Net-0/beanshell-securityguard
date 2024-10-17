@@ -34,17 +34,16 @@ class BSHSwitchStatement
 
     public BSHSwitchStatement(int id) { super(id); }
 
-    public Object eval( CallStack callstack, Interpreter interpreter )
-        throws EvalError
-    {
+    public Object eval(CallStack callstack, Interpreter interpreter) throws EvalError {
         int numchild = jjtGetNumChildren();
         int child = 0;
         Node switchExp = jjtGetChild(child++);
         Object switchVal = switchExp.eval( callstack, interpreter );
 
-        // import enum constants
-        if ( Primitive.unwrap(switchVal) != null && switchVal.getClass().isEnum() )
-            callstack.top().importStatic( switchVal.getClass() );
+        // TODO: ver isso!
+        // // import enum constants
+        // if ( Primitive.unwrap(switchVal) != null && switchVal.getClass().isEnum() )
+        //     callstack.top().importStatic( switchVal.getClass() );
 
 
         /*

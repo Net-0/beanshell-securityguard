@@ -54,6 +54,7 @@ public final class Primitive implements Serializable {
 
     static final Map<Class<?>, Class<?>> wrapperMap = new HashMap<>();
     static {
+        wrapperMap.put( Void.TYPE, Void.class );
         wrapperMap.put( Boolean.TYPE, Boolean.class );
         wrapperMap.put( Byte.TYPE, Byte.class );
         wrapperMap.put( Short.TYPE, Short.class );
@@ -62,6 +63,7 @@ public final class Primitive implements Serializable {
         wrapperMap.put( Long.TYPE, Long.class );
         wrapperMap.put( Float.TYPE, Float.class );
         wrapperMap.put( Double.TYPE, Double.class );
+        wrapperMap.put( Void.class, Void.TYPE );
         wrapperMap.put( Boolean.class, Boolean.TYPE );
         wrapperMap.put( Byte.class, Byte.TYPE );
         wrapperMap.put( Short.class, Short.TYPE );
@@ -278,6 +280,10 @@ public final class Primitive implements Serializable {
         if (obj instanceof Primitive)
             return((Primitive)obj).getValue();
 
+        // TODO: add a This.unwrap()
+        if (This.isObjectWrapper(obj))
+            return ((This) obj)._this;
+
         return obj;
     }
 
@@ -482,9 +488,8 @@ public final class Primitive implements Serializable {
             new Primitive( castWrapper(toType, fromValue) );
     }
 
-    public static boolean isWrapperType( Class<?> type )
-    {
-        return null != type && wrapperMap.containsKey( type ) && !type.isPrimitive();
+    public static boolean isWrapperType(Class<?> type) {
+        return null != type && wrapperMap.containsKey(type) && !type.isPrimitive();
     }
 
     /**

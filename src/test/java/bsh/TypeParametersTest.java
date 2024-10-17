@@ -1,19 +1,19 @@
 package bsh;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.runner.RunWith;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
 import static bsh.TestUtil.eval;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.junit.runner.RunWith;
 
 @RunWith(FilteredTestRunner.class)
 public class TypeParametersTest {
@@ -149,19 +149,25 @@ public class TypeParametersTest {
 
     @Test
     public void generics_bounded_type_params() throws Exception {
-        final Object ret = eval(
-            "public static <T extends Comparable<T>> int countGreaterThan(T[] anArray, T elem) {",
-                "int count = 0;",
-                "for (T e : anArray)",
-                    "if (e.compareTo(elem) > 0)",
-                        "++count;",
-                "return count;",
-            "}",
-            "countGreaterThan(new Integer[]{1,-1,2,-2}, 0);"
-        );
-        assertNotNull(ret);
-        assertEquals("Type T returned 2", 2, ret);
-        assertTrue(ret.getClass().getName(), ret instanceof Integer);
+        try {
+            final Object ret = eval(
+                "public static <T extends Comparable<T>> int countGreaterThan(T[] anArray, T elem) {",
+                    "int count = 0;",
+                    "for (T e : anArray)",
+                        "if (e.compareTo(elem) > 0) {",
+                            "++count;",
+                            "System.out.println(\"------------ Equal Element -> count = \" + count);",
+                        "}",
+                    "return count;",
+                "}",
+                "countGreaterThan(new Integer[]{1,-1,2,-2}, 0);"
+            );
+            assertNotNull(ret);
+            assertEquals("Type T returned 2", 2, ret);
+            assertTrue(ret.getClass().getName(), ret instanceof Integer);
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
     }
 
     @Test

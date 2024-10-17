@@ -18,7 +18,7 @@ package bsh;
 public class BSHEnumConstant extends SimpleNode {
     private static final long serialVersionUID = 1L;
     Modifiers mods = new Modifiers(Modifiers.FIELD);
-    {
+    { // TODO: bloco de código n estático ??? As classes geradas dão suporte à isso ???
         mods.setConstant();
         mods.addModifier("enum");
     }
@@ -26,13 +26,15 @@ public class BSHEnumConstant extends SimpleNode {
 
     public BSHEnumConstant(int id) { super(id); }
 
-    public Object eval( CallStack callstack, Interpreter interpreter ) throws EvalError {
+    public Object eval(CallStack callstack, Interpreter interpreter) throws EvalError {
         NameSpace namespace = callstack.top();
-        if ( !getName().equals(""+namespace.classInstance) )
-            return Primitive.VOID;
+        // TODO: verificar isso!
+        // if ( !getName().equals(""+namespace.classInstance) )
+        //     return Primitive.VOID;
 
-        if (hasArguments(callstack, interpreter))
-            This.CONTEXT_ARGS.get().put( namespace.classInstance.toString(), getArguments(callstack, interpreter) );
+        // TODO: verificar isso!
+        // if (hasArguments(callstack, interpreter))
+        //     This.CONTEXT_ARGS.get().put( namespace.classInstance.toString(), getArguments(callstack, interpreter) );
 
         for ( int i = 0; i < jjtGetNumChildren(); i++ )
             if ( jjtGetChild(i) instanceof BSHBlock )

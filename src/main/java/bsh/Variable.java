@@ -27,6 +27,8 @@ package bsh;
 
 import java.io.Serializable;
 
+import bsh.org.objectweb.asm.Type;
+
 public class Variable implements Serializable, BshClassManager.Listener
 {
     public static final int DECLARATION=0, ASSIGNMENT=1;
@@ -125,7 +127,7 @@ public class Variable implements Serializable, BshClassManager.Listener
         A Variable can represent an LHS for the case of an imported class or
         object field.
     */
-    Object getValue() throws UtilEvalError {
+    Object getValue() throws UtilEvalError { // TODO: ver esse UtilEvalError!
         if ( lhs != null )
             return type == null ?
                 lhs.getValue() : Primitive.wrap( lhs.getValue(), type );
@@ -138,8 +140,7 @@ public class Variable implements Serializable, BshClassManager.Listener
 
     public String getTypeDescriptor() {
         if (null == typeDescriptor)
-            typeDescriptor = BSHType.getTypeDescriptor(
-                type == null ? Object.class : type);
+            typeDescriptor = Type.getDescriptor(type == null ? Object.class : type);
         return typeDescriptor;
     }
 
@@ -173,8 +174,9 @@ public class Variable implements Serializable, BshClassManager.Listener
     /** {@inheritDoc} */
     @Override
     public void classLoaderChanged() {
-        if (Reflect.isGeneratedClass(type)) try {
-            type = Reflect.getThisNS(type).getClass(type.getName());
-        } catch (UtilEvalError e) { /** should not happen on reload */ }
+        // TODO: see it!
+        // if (Reflect.isGeneratedClass(type)) try {
+        //     type = Reflect.getThisNS(type).getClass(type.getName());
+        // } catch (UtilEvalError e) { /** should not happen on reload */ }
     }
 }

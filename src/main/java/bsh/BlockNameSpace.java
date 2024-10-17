@@ -29,6 +29,7 @@ package bsh;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import bsh.internals.BshLocalMethod;
 import bsh.util.ReferenceCache;
 import bsh.util.ReferenceCache.Type;
 
@@ -48,8 +49,7 @@ import bsh.util.ReferenceCache.Type;
     But this has changed a few times so I'd like to leave this abstraction for
     now.
 */
-class BlockNameSpace extends NameSpace
-{
+class BlockNameSpace extends NameSpace {
     /** Atomic block count of unique block instances. */
     public static final AtomicInteger blockCount = new AtomicInteger();
 
@@ -90,8 +90,7 @@ class BlockNameSpace extends NameSpace
      * @param blockId unique id for block
      * @return new or cached instance of a unique block name space */
     public static NameSpace getInstance(NameSpace parent, int blockId ) {
-        BlockNameSpace ns = (BlockNameSpace) blockspaces.get(
-                new UniqueBlock(parent, blockId));
+        BlockNameSpace ns = (BlockNameSpace) blockspaces.get(new UniqueBlock(parent, blockId));
         if (1 < ns.used.getAndIncrement()) ns.clear();
         return ns;
     }
@@ -99,8 +98,7 @@ class BlockNameSpace extends NameSpace
     /** Public constructor to create a non cached instance.
      * @param parent name space
      * @param blockId unique id for block */
-    public BlockNameSpace( NameSpace parent, int blockId )
-    {
+    public BlockNameSpace(NameSpace parent, int blockId) {
         super( parent, parent.getName()+ "/BlockNameSpace" + blockId );
         this.isMethod = parent.isMethod;
     }
@@ -120,10 +118,8 @@ class BlockNameSpace extends NameSpace
         removed, but it cannot.  When recurse is false we still need to set the
         variable in our parent, not here.
     */
-    public Variable setVariable(
-        String name, Object value, boolean strictJava, boolean recurse )
-        throws UtilEvalError
-    {
+    public Variable setVariable(String name, Object value, boolean strictJava, boolean recurse) throws UtilEvalError {
+        // System.out.printf("setVariable() -> name = \"%s\", weHaveVar = %s\n", name, weHaveVar(name));
         if ( weHaveVar( name ) )
             // set the var here in the block namespace
             return super.setVariable( name, value, strictJava, false );
@@ -138,9 +134,7 @@ class BlockNameSpace extends NameSpace
         Typed variables are naturally set locally.
         This is used in try/catch block argument.
     */
-    public void setBlockVariable( String name, Object value )
-        throws UtilEvalError
-    {
+    public void setBlockVariable(String name, Object value) throws UtilEvalError {
         super.setVariable( name, value, false/*strict?*/, false );
     }
 
@@ -149,42 +143,43 @@ class BlockNameSpace extends NameSpace
         it block local scope or an untyped var was explicitly set here via
         setBlockVariable().
     */
-    private boolean weHaveVar( String name )
-    {
+    private boolean weHaveVar(String name) {
         // super.variables.containsKey( name ) not any faster, I checked
         try {
             return super.getVariableImpl( name, false ) != null;
         } catch ( UtilEvalError e ) { return false; }
     }
 
-    /** do we need this? */
-    private NameSpace getNonBlockParent()
-    {
-        NameSpace parent = super.getParent();
-        if ( parent instanceof BlockNameSpace )
-            return ((BlockNameSpace)parent).getNonBlockParent();
-        else
-            return parent;
-    }
+    // /** do we need this? */
+    // private NameSpace getNonBlockParent()
+    // {
+    //     NameSpace parent = super.getParent();
+    //     if ( parent instanceof BlockNameSpace )
+    //         return ((BlockNameSpace)parent).getNonBlockParent();
+    //     else
+    //         return parent;
+    // }
 
-    /**
-        Get a 'this' reference is our parent's 'this' for the object closure.
-        e.g. Normally a 'this' reference to a BlockNameSpace (e.g. if () { } )
-        resolves to the parent namespace (e.g. the namespace containing the
-        "if" statement).
-        @see #getBlockThis( Interpreter )
-    */
-    public This getThis( Interpreter declaringInterpreter ) {
-        return getNonBlockParent().getThis( declaringInterpreter );
-    }
+    // /**
+    //     Get a 'this' reference is our parent's 'this' for the object closure.
+    //     e.g. Normally a 'this' reference to a BlockNameSpace (e.g. if () { } )
+    //     resolves to the parent namespace (e.g. the namespace containing the
+    //     "if" statement).
+    //     @see #getBlockThis( Interpreter )
+    // */
+    // public This getThis( Interpreter declaringInterpreter ) {
+    //     return getNonBlockParent().getThis( declaringInterpreter );
+    // }
 
-    /**
-        super is our parent's super
-    */
-    public This getSuper( Interpreter declaringInterpreter ) {
-        return getNonBlockParent().getSuper( declaringInterpreter );
-    }
+    // // TODO: see it
+    // /**
+    //     super is our parent's super
+    // */
+    // public This getSuper( Interpreter declaringInterpreter ) {
+    //     return getNonBlockParent().getSuper( declaringInterpreter );
+    // }
 
+    // TODO: see it
     /**
         delegate import to our parent
     */
@@ -192,6 +187,7 @@ class BlockNameSpace extends NameSpace
         getParent().importClass( name );
     }
 
+    // TODO: see it
     /**
         delegate import to our parent
     */
@@ -199,7 +195,8 @@ class BlockNameSpace extends NameSpace
         getParent().importPackage( name );
     }
 
-    public void setMethod(BshMethod method) {
+    // TODO: see it
+    public void setMethod(BshLocalMethod method) {
         getParent().setMethod( method );
     }
 }
