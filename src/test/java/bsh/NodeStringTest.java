@@ -184,8 +184,10 @@ public class NodeStringTest {
         assertEquals("PrimarySuffix:CLASS class", node.toString());
         node.operation = BSHPrimarySuffix.INDEX;
         assertEquals("PrimarySuffix:INDEX [false:false false:false]", node.toString());
-        node.operation = BSHPrimarySuffix.NAME;
-        assertEquals("PrimarySuffix:NAME null", node.toString());
+        node.operation = BSHPrimarySuffix.FIELD;
+        assertEquals("PrimarySuffix:FIELD null", node.toString());
+        node.operation = BSHPrimarySuffix.METHOD;
+        assertEquals("PrimarySuffix:METHOD null()", node.toString());
         node.operation = BSHPrimarySuffix.PROPERTY;
         assertEquals("PrimarySuffix:PROPERTY {}", node.toString());
         node.operation = BSHPrimarySuffix.NEW;

@@ -1,5 +1,7 @@
 import java.io.File;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -16,6 +18,14 @@ import bsh.security.SecurityGuard;
 // Note: this class has almost all tests from bsh.security.SecurityGuardTest, the idea of this class is to ensure that we won't have package visibility issues again!
 @RunWith(FilteredTestRunner.class)
 public class SimpleSecurityGuardTest {
+
+    String valueString(Object a) {
+        return null;
+    }
+
+    void tes() {
+        valueString(null);
+    }
 
     public static class MySecurityGuard implements SecurityGuard {}
 
@@ -966,4 +976,18 @@ public class SimpleSecurityGuardTest {
         }
     }
 
+    @Test
+    public void test() throws Throwable {
+        Map<String, Object> baseMap = new HashMap<>();
+        for (int i = 0; i < 10; i++) {
+            final int i2 = i;
+            Object obj = new HashMap<String, Object>(baseMap) {
+                public Object get(Object key) { return i2; }
+
+                // public static void doSomething() {}
+            };
+    
+            System.out.println("Class Name -> " + obj.getClass().getName() + " / " + obj.getClass().hashCode());
+        }
+    }
 }

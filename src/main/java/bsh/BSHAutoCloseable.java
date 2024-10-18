@@ -15,78 +15,61 @@
  * limitations under the License. */
 package bsh;
 
-public class BSHAutoCloseable extends BSHTypedVariableDeclaration {
+// TODO: dar uma olhada nessa classe dps
+// TODO: pq esse Node é público ??
+class BSHAutoCloseable extends BSHTypedVariableDeclaration {
     private static final long serialVersionUID = 1L;
-    public String typeName;
-    public Class<?> type;
-    public String name;
-    public AutoCloseable ths;
-    public Variable varThis;
+    // private String typeName;
+    private Class<?> type;
+    // private String name;
+    private AutoCloseable ths;
+    // public Variable varThis;
 
     public BSHAutoCloseable(int id) { super(id);  }
 
-    public Object eval(CallStack callstack, Interpreter interpreter)
-            throws EvalError {
+    public Object eval(CallStack callStack, Interpreter interpreter) throws EvalError {
+        // renderTypeNode();
+        this.type = this.jjtGetNumChildren() > 1 ? this.evalType(callStack, interpreter) : null;
+        
+        // if (this.type != null && !AutoCloseable.class.isAssignableFrom(this.type))
+        //     throw new EvalException("The resource type "+ this.type.getName() + " does not implement java.lang.AutoCloseable.", this, callStack);
 
-        renderTypeNode();
-        this.type = evalType(callstack, interpreter);
-
-        if (!AutoCloseable.class.isAssignableFrom(this.getType()))
-            throw new EvalException("The resource type "+ this.type.getName()
-                +" does not implement java.lang.AutoCloseable.", this, callstack);
-
-        this.name = this.getDeclarators()[0].name;
+        // this.name = this.getDeclarators()[0].name;
 
         // we let BSHTypedVariableDeclaration do the heavy lifting
-        super.eval(callstack, interpreter);
 
-        try {
-            this.varThis = callstack.top().getVariableImpl(this.getName(), true);
-        } catch (UtilEvalError e) {
-            throw e.toEvalError("Unable to evaluate the try-with-resource "
-                + this.getName() + ". With message:" + e.getMessage(),
-                this, callstack);
-        }
+        // TODO: um BSHAutoCloseable pode ter mais de um VariableDeclartion ? verificar isso!!!!
+
+        final Object _ths = super.eval(callStack, interpreter);
+        if (!(_ths instanceof AutoCloseable))
+            throw new EvalException("The resource type "+ this.type.getName() + " does not implement java.lang.AutoCloseable.", this, callStack);
+
+        this.ths = (AutoCloseable) _ths;
+
+        // try {
+        // this.varThis = callstack.top().getVariableImpl(this.getName(), true);
+        // } catch (UtilEvalError e) {
+        //     throw e.toEvalError("Unable to evaluate the try-with-resource "
+        //         + this.getName() + ". With message:" + e.getMessage(),
+        //         this, callstack);
+        // }
 
         return Primitive.VOID;
     }
 
-    public String getName() {
-        return name;
-    }
+    // public String getName() {
+    //     return name;
+    // }
 
     public void close() throws Throwable {
-        if (null != this.varThis)
-           this.ths = (AutoCloseable) this.varThis.getValue();
+        // if (null != this.varThis)
+        //    this.ths = (AutoCloseable) this.varThis.getValue();
        if (null != this.ths)
            this.ths.close();
     }
 
-    public Class<?> getType() {
-        return this.type;
-    }
+    // public Class<?> getType() {
+    //     return this.type;
+    // }
 
-    /** We may not always have a type node (loose typed resources).
-     * Then we create the BSHType node and get the type
-     * from the BSHVariableDeclarator AllocationExpression nodes. */
-    private void renderTypeNode() {
-        if (jjtGetNumChildren() == 1) {
-            Node tNode = new BSHType(ParserTreeConstants.JJTTYPE);
-            Node ambigName = jjtGetChild(0);
-            while (ambigName.jjtGetNumChildren() > 0)
-                if ((ambigName = ambigName.jjtGetChild(0)) instanceof BSHAmbiguousName)
-                    break;
-            BSHAmbiguousName ambigNew =
-                    new BSHAmbiguousName(ParserTreeConstants.JJTAMBIGUOUSNAME);
-            ambigNew.jjtSetParent(tNode);
-            ambigNew.text = ((BSHAmbiguousName) ambigName).text;
-            tNode.jjtAddChild(ambigNew, 0);
-            tNode.jjtSetParent(this);
-            Node[] n = new Node[2];
-            n[0] = tNode;
-            n[1] = children[0];
-            children = n;
-        }
-    }
 }
-/* JavaCC - OriginalChecksum=c63bf522fd3b08888fb41b7928a3dc8a (do not edit this line) */

@@ -32,8 +32,9 @@ import java.awt.Image;
 
 import javax.swing.JComponent;
 
-import bsh.EvalError;
+import bsh.CallStack;
 import bsh.Interpreter;
+import bsh.Reflect;
 import bsh.This;
 
 /**
@@ -58,16 +59,15 @@ public class BshCanvas extends JComponent {
 
     public void paintComponent( Graphics g ) {
         // copy buffered image
-        if ( imageBuffer != null )
+        if (imageBuffer != null)
             g.drawImage(imageBuffer, 0,0, this);
 
         // Delegate call to scripted paint() method
         if ( ths != null ) {
             try {
-                ths.invokeMethod( "paint", new Object[] { g } );
-            } catch(EvalError e) {
-                Interpreter.debug(
-                    "BshCanvas: method invocation error:", e);
+                Reflect.invokeMethod(ths, "paint", new Object[] { g }, new CallStack(), true);
+            } catch (Throwable e) {
+                Interpreter.debug("BshCanvas: method invocation error:", e);
             }
         }
     }

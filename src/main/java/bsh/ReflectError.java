@@ -28,6 +28,7 @@
 
 package bsh;
 
+// TODO: mudar esse ReflectError para ser um UtilEvalError tlvz ??
 class ReflectError extends RuntimeException
 {
     public ReflectError() { super(); }

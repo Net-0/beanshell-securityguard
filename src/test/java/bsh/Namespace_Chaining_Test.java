@@ -40,12 +40,12 @@ public class Namespace_Chaining_Test {
         final NameSpace root = new NameSpace( null, "root");
         final NameSpace child = new NameSpace(root, "child");
 
-        root.setLocalVariable("bar", 42, false);
-        assertEquals(42, child.getVariable("bar"));
+        root.setLocalVariable("bar", null, 42, null);
+        assertEquals(42, child.getLocalVariable("bar"));
 
-        child.setLocalVariable("bar", 4711, false);
-        assertEquals(4711, child.getVariable("bar"));
-        assertEquals(42, root.getVariable("bar"));
+        child.setLocalVariable("bar", null, 4711, null);
+        assertEquals(4711, child.getLocalVariable("bar"));
+        assertEquals(42, root.getLocalVariable("bar"));
     }
 
 
@@ -92,7 +92,7 @@ public class Namespace_Chaining_Test {
     @Test
     public void check_ExternalNameSpace() throws Exception {
         final ExternalNameSpace externalNameSpace = new ExternalNameSpace();
-        externalNameSpace.setVariable("a", Primitive.NULL, false);
+        externalNameSpace.setLocalVariable("a", null, Primitive.NULL, null);
         assertTrue("map should contain variable 'a'", externalNameSpace.getMap().containsKey("a"));
         assertNull("variable 'a' should have value <NULL>", externalNameSpace.getMap().get("a"));
     }
