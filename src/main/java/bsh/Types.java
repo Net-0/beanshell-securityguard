@@ -26,7 +26,12 @@
 
 package bsh;
 
-import java.lang.reflect.Proxy;
+import java.lang.reflect.Array;
+import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.lang.reflect.WildcardType;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.AbstractMap.SimpleEntry;
@@ -45,6 +50,7 @@ import java.util.Map.Entry;
 */
 class Types {
 
+    // TODO: see it better later!
     /** a uniquely typed Map.Entry which used solely for the purpose
      * of building map expressions and identifiable as Types.MapEntry. */
     static class MapEntry extends SimpleEntry<Object, Object> {
@@ -85,6 +91,7 @@ class Types {
         }
     });
 
+    // TODO: remover essa classe, sem uso; verificar outras classes sem uso para reduzir o tamanho do código!
     /** Helper class for type suffixes. */
     public static class Suffix {
         private static final Map<String, Class<?>> m
@@ -190,7 +197,78 @@ class Types {
             return null;
         if ( arg instanceof Primitive && !boxed )
             return ((Primitive) arg).getType();
-       return Primitive.unwrap(arg).getClass();
+        if ( This.isObjectWrapper(arg) )
+            return ((This) arg).thisClass;
+        return Primitive.unwrap(arg).getClass();
+    }
+
+    static boolean isAssignable(Class<?> from, Class<?> to, int round) {
+        // if (Types.isFunctionalInterface(to) && BshLambda.isAssignable(from, to, round)) return true;
+        switch (round) {
+            case JAVA_BASE_ASSIGNABLE: return isJavaBaseAssignable(to, from);
+            case JAVA_BOX_TYPES_ASSIGABLE: return isJavaBoxTypesAssignable(to, from);
+            case BSH_ASSIGNABLE: return isBshAssignable(to, from);
+            case JAVA_VARARGS_ASSIGNABLE: return false; // return isSignatureVarargsAssignable( from, to );
+            default: throw new InterpreterError("bad case");
+        }
+    }
+
+    static boolean isAssignable(Class<?> from, Type to, int round) {
+        if (to instanceof Class<?>) // Handle a simple type ( like void or Integer )
+            return isAssignable(from, (Class<?>) to, round);
+
+        if (to instanceof ParameterizedType) // Handle parameterized types (like List<T>)
+            return isAssignable(from, ((ParameterizedType) to).getRawType(), round);
+
+        if (to instanceof TypeVariable<?>) { // Handle type variables (like T or R)
+            TypeVariable<?> typeVar = (TypeVariable<?>) to;
+            for (Type bound: typeVar.getBounds())
+                if (!isAssignable(from, bound, round))
+                    return false;
+            return true;
+        }
+
+        if (to instanceof WildcardType) { // Handle wildcards (like ? extends Number)
+            WildcardType wildcardType = (WildcardType) to;
+            for (Type bound: wildcardType.getUpperBounds())
+                if (!isAssignable(from, bound, round))
+                    return false;
+            for (Type bound: wildcardType.getLowerBounds())
+                if (!isAssignable(bound, from, round))
+                    return false;
+            return true;
+        }
+
+        return to == null;
+    }
+
+    static boolean isAssignable(Type from, Class<?> to, int round) {
+        if (from instanceof Class<?>) // Handle a simple type ( like void or Integer )
+            return isAssignable(from, (Class<?>) to, round);
+
+        if (from instanceof ParameterizedType) // Handle parameterized types (like List<T>)
+            return isAssignable(((ParameterizedType) from).getRawType(), to, round);
+
+        if (from instanceof TypeVariable<?>) { // Handle type variables (like T or R)
+            TypeVariable<?> typeVar = (TypeVariable<?>) from;
+            for (Type bound: typeVar.getBounds())
+                if (!isAssignable(bound, to, round))
+                    return false;
+            return true;
+        }
+
+        if (from instanceof WildcardType) { // Handle wildcards (like ? extends Number)
+            WildcardType wildcardType = (WildcardType) from;
+            for (Type bound: wildcardType.getUpperBounds())
+                if (!isAssignable(bound, to, round))
+                    return false;
+            for (Type bound: wildcardType.getLowerBounds())
+                if (!isAssignable(to, bound, round))
+                    return false;
+            return true;
+        }
+
+        return to == null;
     }
 
     /**
@@ -205,29 +283,21 @@ class Types {
         if ( round != JAVA_VARARGS_ASSIGNABLE && from.length != to.length )
             return false;
 
-        switch ( round )
-        {
-            case JAVA_BASE_ASSIGNABLE:
-                for( int i=0; i<from.length; i++ )
-                    if ( !isJavaBaseAssignable( to[i], from[i] ) )
-                        return false;
-                return true;
-            case JAVA_BOX_TYPES_ASSIGABLE:
-                for( int i=0; i<from.length; i++ )
-                    if ( !isJavaBoxTypesAssignable( to[i], from[i] ) )
-                        return false;
-                return true;
-            case JAVA_VARARGS_ASSIGNABLE:
+        for (int i = 0; i < from.length; i++)
+            if (!isAssignable(from[i], to[i], round))
                 return false;
-                // return isSignatureVarargsAssignable( from, to );
-            case BSH_ASSIGNABLE:
-                for( int i=0; i<from.length; i++ )
-                    if ( !isBshAssignable( to[i], from[i] ) )
-                        return false;
-                return true;
-            default:
-                throw new InterpreterError("bad case");
-        }
+        return true;
+    }
+
+    static boolean isSignatureAssignable( Class<?>[] from, Type[] to, int round )
+    {
+        if ( round != JAVA_VARARGS_ASSIGNABLE && from.length != to.length )
+            return false;
+
+        for (int i = 0; i < from.length; i++)
+            if (!isAssignable(from[i], to[i], round))
+                return false;
+        return true;
     }
 
     /**
@@ -246,36 +316,6 @@ class Types {
         return true;
     }
 
-    private static boolean isSignatureVarargsAssignable(
-        Class<?>[] from, Class<?>[] to )
-    {
-        if ( to.length == 0 || to.length > from.length + 1 )
-            return false;
-
-        int last = to.length - 1;
-        if ( to[last] == null || !to[last].isArray() )
-            return false;
-
-        if ( from.length == to.length
-                && from[last] != null
-                && from[last].isArray()
-                && !isJavaAssignable(to[last].getComponentType(),
-                        from[last].getComponentType()) )
-            return false;
-
-        if ( from.length >= to.length
-                && from[last] != null
-                && !from[last].isArray() )
-            for ( int i = last; i < from.length; i++ )
-                if ( !isJavaAssignable(to[last].getComponentType(), from[i]) )
-                    return false;
-
-        for ( int i = 0; i < last; i++ )
-            if ( !isJavaAssignable(to[i], from[i]) )
-                return false;
-
-        return true;
-    }
 
     /**
         Test if a conversion of the rhsType type to the lhsType type is legal via
@@ -390,7 +430,7 @@ class Types {
      */
     static boolean isBshAssignable( Class<?> toType, Class<?> fromType )
     {
-        try {
+        try { // TODO: verificar isso!
             return castObject(
                 toType, fromType, null/*fromValue*/,
                 ASSIGNMENT, true/*checkOnly*/
@@ -399,6 +439,10 @@ class Types {
             // This should not happen with checkOnly true
             throw new InterpreterError("err in cast check: "+e, e);
         }
+    }
+
+    protected static final Class<?> arrayType(Class<?> componentType) {
+        return Array.newInstance(componentType, 0).getClass();
     }
 
     /** Find array element type for class.
@@ -470,26 +514,21 @@ class Types {
 
         @see #isBshAssignable( Class, Class )
     */
-    public static Object castObject(
-        Object fromValue, Class<?> toType, int operation )
-        throws UtilEvalError
-    {
-        if ( fromValue == null ) {
-            if ( operation == Types.CAST )
-                if ( !isPrimitive(toType) && !Primitive.isWrapperType(toType) )
-                    return Primitive.NULL;
-                else
-                    return Primitive.getDefaultValue(toType);
+    public static Object castObject(Object fromValue, Class<?> toType, int operation) throws UtilEvalError {
+        if (fromValue == null || fromValue == Primitive.NULL) {
+            // if (operation == Types.CAST)
+            if ( !isPrimitive(toType) && !Primitive.isWrapperType(toType) )
+                return Primitive.NULL;
+            else
+                return Primitive.getDefaultValue(toType);
 
-            throw new InterpreterError(
-                    "Cast error: null fromValue for toType: "
-                    + toType.getSimpleName());
+            // System.out.println("Types.castObject(): ");
+            // System.out.println(" - fromValue: " + fromValue);
+            // System.out.println(" - toType: " + toType);
+            // throw new InterpreterError("Cast error: null fromValue for toType: " + toType.getSimpleName());
         }
 
-        Class<?> fromType = getType(fromValue);
-
-        return castObject(
-            toType, fromType, fromValue, operation, false/*checkonly*/ );
+        return castObject(toType, getType(fromValue), fromValue, operation, false);
     }
 
     /**
@@ -553,18 +592,14 @@ class Types {
         Notes: This method is currently responsible for auto-boxing/unboxing
         conversions...  Where does that need to go?
     */
-    public static Object castObject( Class<?> toType, Class<?> fromType, Object fromValue,
-            int operation, boolean checkOnly ) throws UtilEvalError {
+    public static Object castObject(Class<?> toType, Class<?> fromType, Object fromValue, int operation, boolean checkOnly) throws UtilEvalError {
         // assignment to loose type, void type, or exactly same type
-        if ( toType == null || arrayElementType(toType) == arrayElementType(fromType) )
-            return checkOnly ? VALID_CAST :
-                fromValue;
+        if (toType == null || arrayElementType(toType) == arrayElementType(fromType))
+            return checkOnly ? VALID_CAST : fromValue;
 
-        if ( null != fromType && fromType.isArray() )
-            if ( operation == Types.CAST
-                    || Collection.class.isAssignableFrom(toType) )
-                return checkOnly ? VALID_CAST : BshArray.castArray(
-                        toType, fromType, fromValue );
+        if (null != fromType && fromType.isArray())
+            if (operation == Types.CAST || Collection.class.isAssignableFrom(toType))
+                return checkOnly ? VALID_CAST : BshArray.castArray(toType, fromType, fromValue);
 
         // Casting to primitive type
         if ( toType.isPrimitive() ) {
@@ -572,23 +607,16 @@ class Types {
                 if (!Primitive.class.isInstance(fromValue))
                     fromValue = Primitive.wrap(fromValue, fromType);
                 // Both primitives, do primitive cast
-                return Primitive.castPrimitive( toType, fromType, (Primitive) fromValue,
-                    checkOnly, operation );
+                return Primitive.castPrimitive( toType, fromType, (Primitive) fromValue, checkOnly, operation );
             } else {
                 if (((Types.isNumeric(fromType) || String.valueOf(fromValue).matches("[-+0-9.]*"))
                         && Types.isNumeric(toType)) || toType == Boolean.TYPE) {
                     // Auto widening and narrowing of primitive numeric types
-                    if (checkOnly)
-                        return VALID_CAST;
-                    else
-                        return Primitive.wrap(
-                            Primitive.castWrapper(toType, fromValue), toType);
+                    return checkOnly ? VALID_CAST : Primitive.wrap(Primitive.castWrapper(toType, fromValue), toType);
                 } else {
                     // Cannot cast from arbitrary object to primitive
-                    if ( checkOnly )
-                        return INVALID_CAST;
-                    else
-                        throw castError(toType, fromType, fromValue, operation);
+                    if (checkOnly) return INVALID_CAST;
+                    throw castError(toType, fromType, fromValue, operation);
                 }
             }
         }
@@ -601,8 +629,7 @@ class Types {
             // cast from primitive to wrapper type
             if ( Primitive.isWrapperType( toType ) && fromType != Void.TYPE && fromType != null ) {
                 // primitive to wrapper type
-                return checkOnly ? VALID_CAST :
-                    Primitive.castWrapper(Primitive.unboxType(toType), fromValue);
+                return checkOnly ? VALID_CAST : Primitive.castWrapper(Primitive.unboxType(toType), fromValue);
             }
 
             // Primitive (not null or void) to Object.class type
@@ -614,42 +641,34 @@ class Types {
             // Primitive to arbitrary object type.
             // Allow Primitive.castToType() to handle it as well as cases of
             // Primitive.NULL and Primitive.VOID
-            return Primitive.castPrimitive(
-                toType, fromType, (Primitive)fromValue, checkOnly, operation );
+            return Primitive.castPrimitive(toType, fromType, (Primitive)fromValue, checkOnly, operation);
         }
 
         // If type already assignable no cast necessary
         // We do this last to allow various errors above to be caught.
         // e.g cast Primitive.Void to Object would pass this
         // returns class instance This for generated super types
-        if ( toType.isAssignableFrom( fromType ) )
-            return checkOnly ? VALID_CAST
-                : Reflect.isGeneratedClass(toType) && !Proxy.isProxyClass(fromType)
-                ? Reflect.getClassInstanceThis(fromValue, toType.getSimpleName())
-                : fromValue;
-
-        // Allow This to pass as typed variable if classStatic is toType
-        if (This.class.isInstance(fromValue)
-                && ((This)fromValue).getNameSpace().classStatic == toType)
+        if (toType.isAssignableFrom(fromType)) {
+            // TODO: ver isso
             return checkOnly ? VALID_CAST : fromValue;
 
-        // Can we use the proxy mechanism to cast a bsh.This to
-        // the correct interface?
-        if ( toType.isInterface() && bsh.This.class.isAssignableFrom( fromType ) )
-            return checkOnly ? VALID_CAST :
-                ((bsh.This)fromValue).getInterface( toType );
+            // if (checkOnly) return VALID_CAST;
+            // TODO: Remover os Proxys do código!!!
+            // return Reflect.isGeneratedClass(toType) && !Proxy.isProxyClass(fromType)
+            //         ? Reflect.getClassInstanceThis(fromValue, toType.getSimpleName())
+            //         : fromValue;
+        }
+
+        if (This.isObjectWrapper(fromValue) && toType.isAssignableFrom(((This) fromValue).thisClass))
+            return checkOnly ? VALID_CAST : ((This) fromValue)._this;
 
         // Both numeric wrapper types?
         // Try numeric style promotion wrapper cast
-        if ( Primitive.isWrapperType( toType )
-            && Primitive.isWrapperType( fromType ) )
-            return checkOnly ? VALID_CAST :
-                Primitive.castWrapper( toType, fromValue );
+        if (Primitive.isWrapperType(toType) && Primitive.isWrapperType(fromType))
+            return checkOnly ? VALID_CAST : Primitive.castWrapper( toType, fromValue );
 
-        if ( checkOnly )
-            return INVALID_CAST;
-        else
-            throw castError(toType, fromType, fromValue, operation);
+        if (checkOnly) return INVALID_CAST;
+        throw castError(toType, fromType, fromValue, operation);
     }
 
     /**
@@ -720,50 +739,50 @@ class Types {
                 || number instanceof BigDecimal;
     }
 
-    /** Check if object is a Map type property type.
-     * @param obj to identify as a property type.
-     * @return true if object is a property type.*/
-    public static boolean isPropertyTypeMap(Object obj) {
-        return obj instanceof Map;
-    }
+    // /** Check if object is a Map type property type.
+    //  * @param obj to identify as a property type.
+    //  * @return true if object is a property type.*/
+    // public static boolean isPropertyTypeMap(Object obj) {
+    //     return obj instanceof Map;
+    // }
 
-    /** Check if class is a Map type property type.
-     * @param clas to identify as a property type.
-     * @return true if class is a property type.*/
-    public static boolean isPropertyTypeMap(Class<?> clas) {
-        return Map.class.isAssignableFrom(clas);
-    }
+    // /** Check if class is a Map type property type.
+    //  * @param clas to identify as a property type.
+    //  * @return true if class is a property type.*/
+    // public static boolean isPropertyTypeMap(Class<?> clas) {
+    //     return Map.class.isAssignableFrom(clas);
+    // }
 
-    /** Check if object is an Entry type property type.
-     * @param obj to identify as a property type.
-     * @return true if object is a property type.*/
-    public static boolean isPropertyTypeEntry(Object obj) {
-        return obj instanceof Entry;
-    }
+    // /** Check if object is an Entry type property type.
+    //  * @param obj to identify as a property type.
+    //  * @return true if object is a property type.*/
+    // public static boolean isPropertyTypeEntry(Object obj) {
+    //     return obj instanceof Entry;
+    // }
 
-    /** Check if class is an Entry type property type.
-     * @param clas to identify as a property type.
-     * @return true if class is a property type.*/
-    public static boolean isPropertyTypeEntry(Class<?> clas) {
-        return Entry.class.isAssignableFrom(clas);
-    }
+    // /** Check if class is an Entry type property type.
+    //  * @param clas to identify as a property type.
+    //  * @return true if class is a property type.*/
+    // public static boolean isPropertyTypeEntry(Class<?> clas) {
+    //     return Entry.class.isAssignableFrom(clas);
+    // }
 
-    /** Check if class is an Entry[] type property type.
-     * @param clas to identify as a property type.
-     * @return true if class is a property type.*/
-    public static boolean isPropertyTypeEntryList(Class<?> clas) {
-        return clas.isArray()
-                && isPropertyTypeEntry(clas.getComponentType());
-    }
+    // /** Check if class is an Entry[] type property type.
+    //  * @param clas to identify as a property type.
+    //  * @return true if class is a property type.*/
+    // public static boolean isPropertyTypeEntryList(Class<?> clas) {
+    //     return clas.isArray()
+    //             && isPropertyTypeEntry(clas.getComponentType());
+    // }
 
-    /** Extended property types includes Map, Entry and Entry[].
-     * @param clas to identify as a property type.
-     * @return true if class is a property type.*/
-    public static boolean isPropertyType(Class<?> clas) {
-        return isPropertyTypeMap(clas)
-                || isPropertyTypeEntry(clas)
-                || isPropertyTypeEntryList(clas);
-    }
+    // /** Extended property types includes Map, Entry and Entry[].
+    //  * @param clas to identify as a property type.
+    //  * @return true if class is a property type.*/
+    // public static boolean isPropertyType(Class<?> clas) {
+    //     return isPropertyTypeMap(clas)
+    //             || isPropertyTypeEntry(clas)
+    //             || isPropertyTypeEntryList(clas);
+    // }
 
     /** Collection types include Collection, Map or Entry.
      * @param clas to identify as a property type.
@@ -773,5 +792,315 @@ class Types {
             || Map.class.isAssignableFrom(clas)
             || Entry.class.isAssignableFrom(clas);
     }
+
+    // /**
+    //  * Just a method to return the pretty name of any Class
+    //  *
+    //  * <pre>
+    //  * prettyName(String.class)
+    //  *  returns "java.lang.String"
+    //  * prettyName(byte.class)
+    //  *  returns "byte"
+    //  * prettyName((new Object[3]).getClass())
+    //  *  returns "java.lang.Object[];"
+    //  * prettyName((new int[3][4][5][6][7][8][9]).getClass())
+    //  *  returns "int[][][][][][][]"
+    //  * </pre>
+    //  */
+    // static String prettyName(Class<?> clas) {
+    //     if (clas == null) return "null";
+    //     if (!clas.isArray()) return clas.getName();
+
+    //     // Return a string like "int[]", "double[]", "double[][]", etc...
+    //     Class<?> arrayType = clas.getComponentType();
+    //     return prettyName(arrayType) + "[]";
+    // }
+    
+    // /**
+    //  * Just a method to return the pretty names of some Classes
+    //  * @see Types#prettyName(Class)
+    //  */
+    // static String[] prettyNames(Type[] types) {
+    //     String[] result = new String[types.length];
+    //     for (int i = 0; i < types.length; i++) result[i] = prettyName(types[i]);
+    //     return result;
+    // }
+
+    // static String prettyName(Type type) {
+    //     return prettyName(type, true);
+    // }
+
+    // private static String prettyName(Type type, boolean showTypeVariableBounds) {
+    //     if (type instanceof Class<?>) // Handle a simple type ( like void or Integer )
+    //         return prettyName((Class<?>) type);
+        
+    //     if (type instanceof ParameterizedType) { // Handle parameterized types (like List<T>)
+    //         ParameterizedType paramType = (ParameterizedType) type;
+    //         Type[] params = paramType.getActualTypeArguments();
+    //         String[] paramsNames = new String[params.length];
+    //         for (int i = 0; i < params.length; i++) paramsNames[i] = prettyName(params[i], false);
+    //         return String.format("%s<%s>", prettyName(paramType.getRawType()), String.join(", ", paramsNames));
+    //     }
+
+    //     if (type instanceof TypeVariable<?>) { // Handle type variables (like T or R)
+    //         TypeVariable<?> typeVar = (TypeVariable<?>) type;
+
+    //         Type[] bounds = typeVar.getBounds();
+    //         if (!showTypeVariableBounds || (bounds.length == 1 && bounds[0] == Object.class)) return typeVar.getName();
+
+    //         String[] boundsStr = new String[bounds.length];
+    //         for (int i = 0; i < bounds.length; i++) boundsStr[i] = prettyName(bounds[i]);
+
+    //         return String.format("%s extends %s", typeVar.getName(), String.join(" & ", boundsStr));
+    //     }
+
+    //     if (type instanceof WildcardType) { // Handle wildcards (like '? extends Number' and '? super Integer')
+    //         WildcardType wildcardType = (WildcardType) type;
+
+    //         Type[] upperBounds = wildcardType.getUpperBounds();
+    //         if (upperBounds[0] != Object.class) {
+    //             String[] upperBoundsStr = new String[upperBounds.length];
+    //             for (int i = 0; i < upperBounds.length; i++) upperBoundsStr[i] = prettyName(upperBounds[i]);
+    //             return String.format("? extends %s", String.join(" & ", upperBoundsStr));
+    //         }
+
+    //         Type[] lowerBounds = wildcardType.getLowerBounds();
+    //         if (lowerBounds.length != 0) {
+    //             String[] lowerBoundsStr = new String[lowerBounds.length];
+    //             for (int i = 0; i < lowerBounds.length; i++) lowerBoundsStr[i] = prettyName(lowerBounds[i]);
+    //             return String.format("? super %s", String.join(" & ", lowerBoundsStr));
+    //         }
+
+    //         return "?";
+    //     }
+        
+    //     if (type == null) return "null";
+
+    //     throw new RuntimeException("Can't return a pretty name because the type is unknown!");
+    // }
+
+    // // TODO: verificar os métodos novos e remover oq n está em uso!
+
+    // static bsh.org.objectweb.asm.Type getASMType(Type type) {
+    //     return bsh.org.objectweb.asm.Type.getType(getRawType(type));
+    // }
+
+    // static bsh.org.objectweb.asm.Type getASMType(Class<?> type) {
+    //     return bsh.org.objectweb.asm.Type.getType(type);
+    // }
+
+    // static bsh.org.objectweb.asm.Type getASMType(String typeDescriptor) {
+    //     return bsh.org.objectweb.asm.Type.getType(typeDescriptor);
+    // }
+
+    // static String getInternalName(Type type) {
+    //     return bsh.org.objectweb.asm.Type.getInternalName(getRawType(type));
+    // }
+
+    // // TODO: review all 'Class<?>' params to methods, shouldn't they be 'java.lang.reflect.Type' ?
+    // static String[] getInternalNames(Type[] types) {
+    //     final String[] internalNames = new String[types.length];
+    //     for (int i = 0; i < types.length; i++) internalNames[i] = getInternalName(types[i]);
+    //     return internalNames;
+    // }
+
+    // static String getDescriptor(Type type) {
+    //     return bsh.org.objectweb.asm.Type.getDescriptor(getRawType(type));
+    // }
+
+    // static String getMethodDescriptor(Method method) {
+    //     return bsh.org.objectweb.asm.Type.getMethodDescriptor(method);
+    // }
+
+    // static String getMethodDescriptor(Type returnType, Type  ...argumentTypes) {
+    //     final bsh.org.objectweb.asm.Type _returnType = bsh.org.objectweb.asm.Type.getType(getRawType(returnType));
+    //     final bsh.org.objectweb.asm.Type[] _argumentTypes = new bsh.org.objectweb.asm.Type[argumentTypes.length];
+    //     for (int i = 0; i < argumentTypes.length; i++) _argumentTypes[i] = bsh.org.objectweb.asm.Type.getType(getRawType(argumentTypes[i]));
+    //     return bsh.org.objectweb.asm.Type.getMethodDescriptor(_returnType, _argumentTypes);
+    // }
+
+    // // Helper method to convert Type to ASM style signature
+    // /** Return the signature of a specific type to be used in ASM bytecodes */
+    // static String getASMSignature(Type type) {
+    //     if (type instanceof Class<?>) return bsh.org.objectweb.asm.Type.getDescriptor((Class<?>) type); // Handle a simple type ( like void or Integer )
+
+    //     if (type instanceof ParameterizedType) { // Handle parameterized types (like List<T>)
+    //         ParameterizedType paramType = (ParameterizedType) type;
+    //         StringBuilder paramSignature = new StringBuilder();
+    //         paramSignature.append("L" + bsh.org.objectweb.asm.Type.getInternalName((Class<?>) paramType.getRawType())); // Base type
+    //         paramSignature.append("<");
+    //         for (Type arg : paramType.getActualTypeArguments()) {
+    //             paramSignature.append(getASMSignature(arg));
+    //         }
+    //         paramSignature.append(">;");
+    //         return paramSignature.toString();
+    //     }
+
+    //     if (type instanceof TypeVariable<?>) // Handle type variables (like T or R)
+    //         return "T" + ((TypeVariable<?>) type).getName() + ";";
+
+    //     if (type instanceof WildcardType) { // Handle wildcards (like ? extends Number)
+    //         WildcardType wildcard = (WildcardType) type;
+    //         Type[] lowerBounds = wildcard.getLowerBounds();
+    //         return lowerBounds.length > 0
+    //                 ? "-" + bsh.org.objectweb.asm.Type.getDescriptor((Class<?>) lowerBounds[0])
+    //                 : "+" + bsh.org.objectweb.asm.Type.getDescriptor((Class<?>) wildcard.getUpperBounds()[0]);
+    //     }
+
+    //     throw new IllegalArgumentException("Can't get the signature of this type because its Class is unknown: " + (type != null ? type.getClass() : null));
+    // }
+
+    // // TODO: testes com enums, interfaces e classes
+    // static String getASMClassSignature(TypeVariable<?>[] types, Type superClass, Type ...interfaces) {
+    //     StringBuilder signature = new StringBuilder();
+
+    //     // 1. Extract type parameters (generics)
+    //     if (types.length != 0) {
+    //         signature.append("<");
+    //         for (TypeVariable<?> typeParam : types) {
+    //             signature.append(typeParam.getName()); // Add the type variable (e.g.: "T")
+
+    //             for (Type bound : typeParam.getBounds()) // Add the bound of the type variable (e.g.: 'extends Number' => ":Ljava/lang/Number;")
+    //                 signature.append(":").append(getASMSignature(bound));
+    //         }
+    //         signature.append(">");
+    //     }
+
+    //     // 2. Add the superclass in the signature
+    //     signature.append(getASMSignature(superClass)); // All wrapper classes doesn't have a superclass, thus extends Object
+
+    //     // 3. Add interfaces in the signature
+    //     for (Type interface_: interfaces) signature.append(getASMSignature(interface_));
+
+    //     return signature.toString();
+    // }
+
+    // // TODO: testes com vários métodos
+    // static String getASMMethodSignature(Method method) {
+    //     return getASMMethodSignature(method.getTypeParameters(), method.getGenericParameterTypes(), method.getGenericReturnType(), method.getGenericExceptionTypes());
+    // }
+
+    // static String getASMMethodSignature(TypeVariable<?>[] typeParams, Type[] params, Type returnType, Type[] exceptions) {
+    //     StringBuilder signature = new StringBuilder();
+
+    //     // 1. Handle generic type parameters (if any)
+    //     if (typeParams.length > 0) {
+    //         signature.append("<");
+    //         for (TypeVariable<?> typeParam : typeParams) {
+    //             signature.append(typeParam.getName()); // Add type variable (e.g., "T")
+    //             for (Type bound : typeParam.getBounds())
+    //                 signature.append(":").append(getASMSignature(bound)); // Add the bound
+    //         }
+    //         signature.append(">");
+    //     }
+
+    //     // 2. Add the method parameter types
+    //     signature.append("(");
+    //     for (Type param : params) signature.append(getASMSignature(param));
+    //     signature.append(")");
+
+    //     // 3. Add the return type
+    //     signature.append(getASMSignature(returnType));
+
+    //     // 4. Add the exception types (if any)
+    //     for (Type exceptionType : exceptions) signature.append("^").append(getASMSignature(exceptionType));
+
+    //     return signature.toString();
+    // }
+
+    // static Class<?> getRawType(Type type) {
+    //     if (type instanceof Class<?>) return (Class<?>) type; // Handle a simple type ( like void or Integer )
+
+    //     if (type instanceof ParameterizedType) { // Handle parameterized types (like List<T>)
+    //         ParameterizedType paramType = (ParameterizedType) type;
+    //         return getRawType(paramType.getRawType());
+    //     }
+
+    //     // TODO: make a unit tests for it, it's always the first bound!!!!
+    //     if (type instanceof TypeVariable<?>) { // Handle type variables (like T or R)
+    //         TypeVariable<?> typeVar = ((TypeVariable<?>) type);
+    //         return getRawType(typeVar.getBounds()[0]);
+    //     }
+
+    //     // TODO: make unit test for it too!
+    //     if (type instanceof WildcardType) { // Handle wildcards (like ? extends Number)
+    //         WildcardType wildcard = (WildcardType) type;
+    //         Type bound = wildcard.getLowerBounds().length > 0 ? wildcard.getLowerBounds()[0] : wildcard.getUpperBounds()[0];
+    //         return getRawType(bound);
+    //     }
+
+    //     throw new IllegalArgumentException("Can't raw type of this type because its Class is unknown: " + (type != null ? type.getClass() : null));
+    // }
+
+    // // if (type instanceof ParameterizedType) { // Handle parameterized types (like List<T>)
+    // //     ParameterizedType paramType = (ParameterizedType) type;
+    // //     StringBuilder paramSignature = new StringBuilder();
+    // //     paramSignature.append("L" + bsh.org.objectweb.asm.Type.getInternalName((Class<?>) paramType.getRawType())); // Base type
+    // //     paramSignature.append("<");
+    // //     for (Type arg : paramType.getActualTypeArguments()) {
+    // //         paramSignature.append(getASMSignature(arg));
+    // //     }
+    // //     paramSignature.append(">;");
+    // //     return paramSignature.toString();
+    // // }
+
+    // // // if (type instanceof TypeVariable<?>) // Handle type variables (like T or R)
+    // // //     return "T" + ((TypeVariable<?>) type).getName() + ";";
+    // // static TypeVariable<?> createTypeVariable(String name, Type[] bounds) {
+    // //     // TODO: see it!
+    // //     // bounds = bounds == null || bounds.length == 0 ? new Type[] { Object.class } : bounds;
+
+    // //     return new TypeVariable<GenericDeclaration>() {
+    // //         public String getName() { return name; }
+    // //         public <T extends Annotation> T getAnnotation(Class<T> annotationClass) { return null; }
+    // //         public Annotation[] getAnnotations() { return new Annotation[0]; }
+    // //         public Annotation[] getDeclaredAnnotations() { return new Annotation[0]; }
+    // //         public AnnotatedType[] getAnnotatedBounds() { throw new UnsupportedOperationException("Unimplemented method 'getAnnotatedBounds'"); }
+    // //         public Type[] getBounds() { return bounds; }
+    // //         public GenericDeclaration getGenericDeclaration() { throw new UnsupportedOperationException("Unimplemented method 'getGenericDeclaration'"); };
+    // //     };
+    // // }
+
+    // // e.g., java.util.Map<java.lang.String, java.lang.Object>
+    // static ParameterizedType createParameterizedType(Type rawType, Type[] typeArguments) {
+    //     return new ParameterizedType() {
+    //         public Type[] getActualTypeArguments() { return typeArguments; }
+    //         public Type getRawType() { return rawType; }
+    //         public Type getOwnerType() { return null; }
+    //     };
+    // }
+
+    // if (type instanceof TypeVariable<?>) // Handle type variables (like T or R)
+    //     return "T" + ((TypeVariable<?>) type).getName() + ";";
+    // static TypeVariable<?> createTypeVariable(String name, Type[] bounds) {
+    //     // TODO: see it!
+    //     // bounds = bounds == null || bounds.length == 0 ? new Type[] { Object.class } : bounds;
+
+    //     return new TypeVariable<GenericDeclaration>() {
+    //         public String getName() { return name; }
+    //         public <T extends Annotation> T getAnnotation(Class<T> annotationClass) { return null; }
+    //         public Annotation[] getAnnotations() { return new Annotation[0]; }
+    //         public Annotation[] getDeclaredAnnotations() { return new Annotation[0]; }
+    //         public AnnotatedType[] getAnnotatedBounds() { throw new UnsupportedOperationException("Unimplemented method 'getAnnotatedBounds'"); }
+    //         public Type[] getBounds() { return bounds; }
+    //         public GenericDeclaration getGenericDeclaration() { throw new UnsupportedOperationException("Unimplemented method 'getGenericDeclaration'"); };
+    //     };
+    // }
+
+    // static ParameterizedType createParameterizedType(Type rawType, Type[] typeArguments) {
+    //     return new ParameterizedType() {
+    //         public Type[] getActualTypeArguments() { return typeArguments; }
+    //         public Type getRawType() { return rawType; }
+    //         public Type getOwnerType() { return null; }
+    //     };
+    // }
+
+    // if (type instanceof WildcardType) { // Handle wildcards (like ? extends Number)
+    //     WildcardType wildcard = (WildcardType) type;
+    //     Type[] lowerBounds = wildcard.getLowerBounds();
+    //     return lowerBounds.length > 0
+    //             ? "-" + bsh.org.objectweb.asm.Type.getDescriptor((Class<?>) lowerBounds[0])
+    //             : "+" + bsh.org.objectweb.asm.Type.getDescriptor((Class<?>) wildcard.getUpperBounds()[0]);
+    // }
 
 }

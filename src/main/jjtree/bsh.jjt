@@ -597,37 +597,61 @@ void ClassDeclaration() #ClassDeclaration :
     mods = Modifiers( Modifiers.CLASS, false )
   (
     (
-        "class" { jjtThis.type = ClassGenerator.Type.CLASS; } name=<IDENTIFIER>
-        [ "extends" AmbiguousName() { jjtThis.extend = true; } ]
+        "class"
+        //{ jjtThis.type = ClassGenerator.Type.CLASS; }
+        name=<IDENTIFIER>
+        [ "extends" Name() { jjtThis.extend = true; } ]
         [ "implements" numInterfaces=NameList()
         { jjtThis.numInterfaces=numInterfaces; } ]
       |
-        "interface" { jjtThis.type = ClassGenerator.Type.INTERFACE; } name=<IDENTIFIER>
+        // TODO: interfaces são geradas vazias ?????????????????
+        "interface"
+        { jjtThis.isInterface = true; }
+        //{ jjtThis.type = ClassGenerator.Type.INTERFACE; }
+        name=<IDENTIFIER>
         [ "extends" numInterfaces=NameList()
             { jjtThis.numInterfaces=numInterfaces; } ]
     )
+    //"{" ( ClassMember() )* "}"
+    // TODO: fazer testes em cima do 'static' e 'synchronized' do BSHBlock base da classe e ver o 'synchronized' do BSHBlock initializer tb!
     Block()
   |
-    "enum" { jjtThis.type = ClassGenerator.Type.ENUM; } name=<IDENTIFIER>
+    "enum"
+    { jjtThis.isEnum = true; }
+    //{ jjtThis.type = ClassGenerator.Type.ENUM; }
+    name=<IDENTIFIER>
     [ "implements" numInterfaces=NameList()
     { jjtThis.numInterfaces=numInterfaces; } ]
     EnumBlock()
+    //"{" ( EnumConstant() )? ( "," EnumConstant() )* [ ";" ( ClassMember() )* ] "}"
   )
     {
         if (null != mods) jjtThis.modifiers = mods;
-        jjtThis.name = name.image;
+        jjtThis.simpleName = name.image;
     }
 }
 
-void EnumConstant() #EnumConstant:
+void ClassMember():
+{ }
 {
-    Token t;
+  LOOKAHEAD( Modifiers( Modifiers.FIELD, true ) ( "class" | "interface" | "enum" ) )
+    ClassDeclaration()
+|
+  LOOKAHEAD ( Modifiers( Modifiers.METHOD, true ) [ ReturnType() ] <IDENTIFIER> "(" )
+    MethodDeclaration()
+|
+  LOOKAHEAD ( Modifiers( Modifiers.METHOD, true ) <IDENTIFIER> FormalParameters() [ "throws" NameList() ] "{" )
+    MethodDeclaration()
+|
+  LOOKAHEAD( Modifiers( Modifiers.FIELD, true ) Type() <IDENTIFIER> )
+    TypedVariableDeclaration() ";"
 }
+
+void EnumConstant() #EnumConstant:
+{ Token t; }
 {
   t=<IDENTIFIER> [ Arguments() ] [ Block() ]
-  {
-    jjtThis.name=t.image;
-  }
+  { jjtThis.name=t.image; }
 }
 
 void EnumBlock() #Block :
@@ -653,6 +677,7 @@ void MethodDeclaration() #MethodDeclaration :
     ReturnType()
     t = <IDENTIFIER> { jjtThis.name = t.image; }
 )
+    //[ ReturnType() ] t = <IDENTIFIER> { jjtThis.name = t.image; }
     FormalParameters()
     [ "throws" count=NameList() { jjtThis.numThrows=count; } ]
     ( Block() | ";" )
@@ -661,15 +686,16 @@ void MethodDeclaration() #MethodDeclaration :
 void PackageDeclaration () #PackageDeclaration:
 { }
 {
-    "package" AmbiguousName()
+    "package" Name()
 }
 
+// TODO: mudar o 'AmbiguousName' ?
 void ImportDeclaration() #ImportDeclaration :
 { }
 {
   LOOKAHEAD( 3 )
   "import" [ "static" { jjtThis.staticImport = true; } ]
-  AmbiguousName() [ "." "*" { jjtThis.importPackage = true; } ] ";"
+  Name() [ "." "*" { jjtThis.importPackage = true; } ] ";"
 |
    // bsh super import statement
   "import" "*" ";" { jjtThis.superImport = true; }
@@ -734,7 +760,7 @@ void Type() #Type :
         PrimaryPrefix.  ( )* is a choice point.  It took me a while to
         figure out where to put that.  This stuff is annoying.
     */
-  ( PrimitiveType() | AmbiguousName() )
+  ( PrimitiveType() | Name() )
     ( LOOKAHEAD(2) "[" "]" { jjtThis.addArrayDimension(); } )*
 }
 
@@ -749,6 +775,21 @@ void ReturnType() #ReturnType :
   Type()
 }
 
+// TODO: ver isso!!
+void TypeParameter() :
+{ }
+{
+  (AdvancedType() | "?")
+  [("extends" | "super") AdvancedType()]
+}
+
+void AdvancedType() #AdvancedType :
+{ }
+{
+  { System.out.println("AdvancedTypeeeeeeee"); }
+  AmbiguousName() [ "<" [(TypeParameter() ",")* TypeParameter()] ">" ]
+}
+
 void PrimitiveType() #PrimitiveType :
 { } {
   "boolean" { jjtThis.type = Boolean.TYPE; }
@@ -759,6 +800,20 @@ void PrimitiveType() #PrimitiveType :
 | "long" { jjtThis.type =  Long.TYPE; }
 | "float" { jjtThis.type =  Float.TYPE; }
 | "double" { jjtThis.type =  Double.TYPE; }
+}
+
+void Name() #Name :
+{
+  Token t;
+  StringBuilder s;
+}
+{
+  t = <IDENTIFIER> { s = new StringBuilder(t.image); }
+  (
+    LOOKAHEAD(2)
+      "." t = <IDENTIFIER> { s.append("."+t.image); }
+  )*
+  { jjtThis.name = s.toString(); }
 }
 
 void AmbiguousName() #AmbiguousName :
@@ -774,15 +829,20 @@ void AmbiguousName() #AmbiguousName :
   t = <IDENTIFIER> {
     s = new StringBuilder(t.image);
   }
-  ( LOOKAHEAD(2) "." t = <IDENTIFIER> { s.append("."+t.image); } )* {
-    jjtThis.text = s.toString();
-  }
+  //( LOOKAHEAD(2) "." t = <IDENTIFIER> { s.append("."+t.image); } )*
+
+  (
+    LOOKAHEAD({ getToken(1).kind == DOT && getToken(2).kind == IDENTIFIER && getToken(3).kind != LPAREN })
+      "." t = <IDENTIFIER> { s.append("."+t.image); }
+  )*
+
+  { jjtThis.name = s.toString(); }
 }
 
 int NameList() :
 { int count = 1; }
 {
-  AmbiguousName() ( "," AmbiguousName() { ++count; } )*
+  Name() ( "," Name() { ++count; } )*
   { return count; }
 }
 
@@ -960,9 +1020,9 @@ void CastLookahead() : { }
 {
   LOOKAHEAD(2) <LPAREN> PrimitiveType()
 |
-  LOOKAHEAD( <LPAREN> AmbiguousName() <LBRACKET> ) <LPAREN> AmbiguousName() <LBRACKET> <RBRACKET>
+  LOOKAHEAD( <LPAREN> Name() <LBRACKET> ) <LPAREN> Name() <LBRACKET> <RBRACKET>
 |
- <LPAREN> AmbiguousName() <RPAREN> ( <TILDE> | <BANG> | <LPAREN> | <IDENTIFIER> | <NEW> | Literal() | ArrayDimensions() )
+ <LPAREN> Name() <RPAREN> ( <TILDE> | <BANG> | <LPAREN> | <IDENTIFIER> | <NEW> | Literal() | ArrayDimensions() )
 }
 
 void CastExpression() #CastExpression :
@@ -976,9 +1036,13 @@ void PrimaryExpression() #PrimaryExpression : { }
   PrimaryPrefix() ( PrimarySuffix() )*
 }
 
-void MethodInvocation() #MethodInvocation : { }
+void MethodInvocation() #MethodInvocation :
 {
-   AmbiguousName() Arguments()
+  Token t;
+}
+{
+  t = <IDENTIFIER> Arguments()
+  { jjtThis.methodName = t.image; }
 }
 
 void PrimaryPrefix() : { }
@@ -989,14 +1053,13 @@ void PrimaryPrefix() : { }
 |
   AllocationExpression()
 |
-  LOOKAHEAD( AmbiguousName() "(" ( Expression() | ")" ) )
+  LOOKAHEAD( <IDENTIFIER> "(" ( Expression() | ")" ) )
     MethodInvocation()
 |
   LOOKAHEAD( Type() "." "class" )
     Type()
 |
   AmbiguousName()
-
 /*
 |
   LOOKAHEAD( "void" "." "class" )
@@ -1020,19 +1083,20 @@ void PrimarySuffix() #PrimarySuffix :
         jjtThis.operation = BSHPrimarySuffix.INDEX;
     }
 |
-    // Safe navigate field access or method invocation
+  // Method invocation
   LOOKAHEAD(2)
-  "?." t = <IDENTIFIER> [ Arguments() ] {
-        jjtThis.operation = BSHPrimarySuffix.NAME;
-        jjtThis.field = t.image;
-        jjtThis.safeNavigate = true;
+  ( "." | "?." { jjtThis.safeNavigate = true; } )
+  t = <IDENTIFIER> Arguments() {
+        jjtThis.operation = BSHPrimarySuffix.METHOD;
+        jjtThis.memberName = t.image;
     }
 |
-    // Field access or method invocation
+  // Field access
   LOOKAHEAD(2)
-  "." t = <IDENTIFIER> [ Arguments() ] {
-        jjtThis.operation = BSHPrimarySuffix.NAME;
-        jjtThis.field = t.image;
+  ( "." | "?." { jjtThis.safeNavigate = true; } )
+  t = <IDENTIFIER> {
+        jjtThis.operation = BSHPrimarySuffix.FIELD;
+        jjtThis.memberName = t.image;
     }
 |
   "{" Expression() "}" {
@@ -1156,13 +1220,14 @@ void ArgumentList() :
   ( "," Expression() )*
 }
 
+// TODO: verificar esse Node, isso aqui faz sentido ?
 void AllocationExpression() #AllocationExpression :
 { }
 {
   "new" (
       PrimitiveType() ArrayDimensions()
    |
-      AmbiguousName() (
+      Name() (
         ArrayDimensions()
       |
         Arguments() [ LOOKAHEAD(2) Block() ]
@@ -1263,18 +1328,20 @@ void BlockStatement() :
   LOOKAHEAD( Modifiers( Modifiers.FIELD, true ) ( "class" | "interface" | "enum" ) )
   ClassDeclaration()
 |
-  LOOKAHEAD ( Modifiers( Modifiers.METHOD, true )
-        ReturnType() <IDENTIFIER> "("
-  )
+  LOOKAHEAD( Modifiers(Modifiers.METHOD, true) <IDENTIFIER> FormalParameters() "{")
     MethodDeclaration()
 |
-  LOOKAHEAD ( Modifiers( Modifiers.METHOD, true )
-        <IDENTIFIER> FormalParameters() [ "throws" NameList() ] "{"
-  )
+  LOOKAHEAD( Modifiers(Modifiers.METHOD, true) ReturnType() <IDENTIFIER> FormalParameters() "{")
+    MethodDeclaration()
+|
+  LOOKAHEAD( Modifiers(Modifiers.METHOD, true) <IDENTIFIER> FormalParameters() "throws" NameList() "{" )
+    MethodDeclaration()
+|
+  LOOKAHEAD( Modifiers(Modifiers.METHOD, true) ReturnType() <IDENTIFIER> FormalParameters() "throws" NameList() "{" )
     MethodDeclaration()
 |
   LOOKAHEAD( Modifiers( Modifiers.FIELD, true ) Type() <IDENTIFIER> )
-  TypedVariableDeclaration() ";"
+    TypedVariableDeclaration() ";"
 |
   Statement()
 |

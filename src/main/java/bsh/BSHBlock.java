@@ -39,8 +39,7 @@ class BSHBlock extends SimpleNode {
     /** Whether the block needs to be synchronized */
     public boolean isSynchronized = false;
 
-    /** This block has a static modifier. To be used as a static
-     * initialization block within a class. */
+    /** This block has a static modifier. To be used as a static initialization block within a class. */
     public boolean isStatic = false;
 
     /** A flag for skipping class declarations when there are none. */
@@ -54,9 +53,7 @@ class BSHBlock extends SimpleNode {
         blockId = BlockNameSpace.blockCount.incrementAndGet();
     }
 
-    public Object eval( CallStack callstack, Interpreter interpreter)
-        throws EvalError
-    {
+    public Object eval( CallStack callstack, Interpreter interpreter) throws EvalError {
         return eval( callstack, interpreter, false );
     }
 
@@ -90,39 +87,33 @@ class BSHBlock extends SimpleNode {
     * @param overrideNamespace whether a new namespace is required
     * @return the result from evaluating the block
     * @throws EvalError rolls exceptions back up to the user */
-    public Object eval( CallStack callstack, Interpreter interpreter,
-            Boolean overrideNamespace ) throws EvalError {
-
+    public Object eval(CallStack callstack, Interpreter interpreter, Boolean overrideNamespace) throws EvalError {
         if ( isSynchronized ) {
             // First node is the expression on which to sync
             Node exp = jjtGetChild(0);
             Object syncValue = exp.eval(callstack, interpreter);
-            synchronized( syncValue ) { // Do the actual synchronization
-                return evalBlock(
-                    callstack, interpreter, overrideNamespace, null/*filter*/);
+            synchronized (syncValue) { // Do the actual synchronization
+                return evalBlock(callstack, interpreter, overrideNamespace, null);
             }
         }
-        return evalBlock(
-                callstack, interpreter, overrideNamespace, null/*filter*/);
+        return evalBlock(callstack, interpreter, overrideNamespace, null);
     }
 
-    Object evalBlock( CallStack callstack, Interpreter interpreter,
-            Boolean overrideNamespace, NodeFilter nodeFilter ) throws EvalError {
+    Object evalBlock(CallStack callstack, Interpreter interpreter, Boolean overrideNamespace, NodeFilter nodeFilter) throws EvalError {
 
         Object ret = Primitive.VOID;
         final NameSpace enclosingNameSpace;
         if ( null == overrideNamespace )
-            enclosingNameSpace = callstack.swap(
-                BlockNameSpace.getInstance(callstack.top(), blockId));
+            enclosingNameSpace = callstack.swap(BlockNameSpace.getInstance(callstack.top(), blockId));
         else if ( !overrideNamespace )
-            enclosingNameSpace = callstack.swap(
-                new BlockNameSpace(callstack.top(), blockId));
+            enclosingNameSpace = callstack.swap(new BlockNameSpace(callstack.top(), blockId));
         else enclosingNameSpace = null;
 
         int startChild = isSynchronized ? 1 : 0;
         int numChildren = jjtGetNumChildren();
 
         try {
+            // TODO: add validation here, Class declaration hoisting isn't a standard Java feature!
             // Evaluate block in two passes:
             // First do class declarations then do everything else.
             if (isFirst || hasClassDeclaration)
@@ -138,7 +129,7 @@ class BSHBlock extends SimpleNode {
                     }
                 }
 
-            List<Node> enumBlocks = null;
+            List<Node> enumBlocks = null; // TODO: see it!!!!!
             for(int i = startChild; i < numChildren; i++) {
                 Node node = jjtGetChild(i);
 
@@ -151,7 +142,7 @@ class BSHBlock extends SimpleNode {
 
                 // enum blocks need to override enum class members
                 // let the class finish initializing first
-                if (node instanceof BSHEnumConstant) {
+                if (node instanceof BSHEnumConstant) { // TODO: see it!!!!!
                     if (enumBlocks == null)
                         enumBlocks = new ArrayList<>();
                     enumBlocks.add(node);
@@ -166,10 +157,11 @@ class BSHBlock extends SimpleNode {
             }
 
             // evaluate the enum constants blocks if any.
-            if (enumBlocks != null)
+            if (enumBlocks != null) // TODO: see it!!!!!
                 while (!enumBlocks.isEmpty())
                     enumBlocks.remove(0).eval( callstack, interpreter );
 
+            // TODO: em strictJava só podemos retornar o valor do ReturnControl!!!
             return ret;
         } finally {
             isFirst = false;

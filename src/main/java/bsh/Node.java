@@ -101,7 +101,7 @@ public interface Node extends ListIterator<Node> {
      * The children are numbered from zero, left to right.
      * @param i child index
      * @return the node at index */
-    Node jjtGetChild(int i);
+    <N extends Node> N jjtGetChild(int i);
 
     /** Return the number of children the node has. */
     int jjtGetNumChildren();

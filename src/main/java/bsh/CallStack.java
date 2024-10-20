@@ -27,10 +27,12 @@
 
 package bsh;
 
-import java.util.Stack;
 import java.io.Serializable;
 import java.util.EmptyStackException;
+import java.util.Stack;
 
+// TODO: não podemos usar a StackTrace de Exceptions ao invés disso ?
+// TODO: fazer melhorias para o EvalError ter uma stackTrace customizada ?
 /**
     A stack of NameSpaces representing the call path.
     Each method invocation, for example, pushes a new NameSpace onto the stack.
@@ -74,13 +76,12 @@ public final class CallStack implements Serializable {
         return stack.peek();
     }
 
-    /**
-        zero based.
-    */
+    /** zero based. */
     public NameSpace get(int depth) {
         int size = stack.size();
         if ( depth >= size )
             return NameSpace.JAVACODE;
+        // return stack.elementAt(size); // TODO: try this!
         return stack.toArray(new NameSpace[size])[size-1-depth];
     }
 

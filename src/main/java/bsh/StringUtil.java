@@ -55,6 +55,7 @@ public class StringUtil {
                 : typeString(Types.getType(value));
     }
 
+    // TODO: ver isso!
     /** Type from class to string.
      * @param clas for type
      * @return string type */
@@ -259,6 +260,7 @@ public class StringUtil {
         return sb.toString();
     }
 
+    // TODO: ver isso melhor dps!
     /** Produce a complete string representation of a reflect method. Shows
      * modifiers, return type, name and parameter types.
      * @param method a java reflect method
@@ -272,32 +274,34 @@ public class StringUtil {
             .append(mods.contains("abstract") ? ";" : " {}").toString();
     }
 
-    /** Produce a complete string representation of a bsh method. Shows
-     * modifiers, return type, name and parameter types.
-     * @param method a bsh method
-     * @return string representation of a method */
-    public static String methodString(BshMethod method) {
-        String mods = method.getModifiers().toString().substring(11);
-        StringBuilder sb = new StringBuilder();
-        return sb.append(mods).append(" ")
-            .append(getTypeName(method.getReturnType())).append(" ")
-            .append(methodString(method.getName(),
-                    method.getParameterTypes(), method.getParameterNames()))
-            .append(mods.contains("abstract") ? ";" : " {}").toString();
-    }
+    // /** Produce a complete string representation of a bsh method. Shows
+    //  * modifiers, return type, name and parameter types.
+    //  * @param method a bsh method
+    //  * @return string representation of a method */
+    // public static String methodString(BshLocalMethod method) {
+    //     String mods = method.getModifiers().toString().substring(11);
+    //     StringBuilder sb = new StringBuilder();
+    //     return sb.append(mods).append(" ")
+    //         .append(getTypeName(method.getReturnType())).append(" ")
+    //         .append(methodString(method.getName(),
+    //                 method.getParameterTypes(), method.getParameterNames()))
+    //         .append(mods.contains("abstract") ? ";" : " {}").toString();
+    // }
 
     /** Produce a string representation of a bsh generated class declaration.
      * Shows modifiers, name, extends and implements.
      * @param type the class to reflect
      * @return string representation of a class declaration */
     private static String generatedClassString(Class<?> type) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(Reflect.getClassModifiers(type).toString().substring(11))
-          .append(type.isInterface() ? " interface" : " class")
-          .append(" ").append(getTypeName(type))
-          .append(getTypeExtends(type))
-          .append(getTypeImplements(type));
-        return sb.append(" {").toString().trim();
+        // StringBuilder sb = new StringBuilder();
+        // sb.append(Reflect.getClassModifiers(type).toString().substring(11))
+        //   .append(type.isInterface() ? " interface" : " class")
+        //   .append(" ").append(getTypeName(type))
+        //   .append(getTypeExtends(type))
+        //   .append(getTypeImplements(type));
+        // return sb.append(" {").toString().trim()
+        // TODO: see it
+        throw new RuntimeException("Not implemented yet!");
     }
 
     /** Produce a string representation of a class declaration.
@@ -318,6 +322,7 @@ public class StringUtil {
         return sb.append(" {").toString().trim();
     }
 
+    // TODO: remover isso ?
     /** Produce a string representation of a bsh variable declaration.
      * Shows modifiers, type and name.
      * @param var the variable to reflect

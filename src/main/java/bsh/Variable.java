@@ -27,134 +27,145 @@ package bsh;
 
 import java.io.Serializable;
 
-public class Variable implements Serializable, BshClassManager.Listener
-{
-    public static final int DECLARATION=0, ASSIGNMENT=1;
+// TODO: ver otimizações para essa classe!
+public class Variable implements Serializable, BshClassManager.Listener {
+    // private static final int DECLARATION=0;
+    // public static final int ASSIGNMENT=1;
+
     /** A null type means an untyped variable */
     String name;
-    Class<?> type = null;
-    String typeDescriptor;
-    Object value;
+    Class<?> type;
+    // String typeDescriptor;
+    private Object value;
     Modifiers modifiers;
-    LHS lhs;
+    // LHS lhs;
 
-    Variable( String name, Class<?> type, LHS lhs )
-    {
-        this.name = name;
-        this.lhs = lhs;
-        this.type = type;
-    }
+    // Variable(String name, Class<?> type, LHS lhs) {
+    //     this.name = name;
+    //     this.lhs = lhs;
+    //     this.type = type;
+    // }
 
-    Variable( String name, Object value, Modifiers modifiers )
-        throws UtilEvalError
-    {
-        this( name, (Class<?>) null/*type*/, value, modifiers );
-    }
+    // Variable(String name, Object value, Modifiers modifiers) throws UtilEvalError {
+    //     this( name, (Class<?>) null/*type*/, value, modifiers );
+    // }
 
-    /**
-        This constructor is used in class generation.
-    */
-    Variable(
-        String name, String typeDescriptor, Object value, Modifiers modifiers
-    )
-        throws UtilEvalError
-    {
-        this( name, (Class<?>) null/*type*/, value, modifiers );
-        this.typeDescriptor = typeDescriptor;
-    }
+    // /** This constructor is used in class generation. */
+    // Variable(String name, String typeDescriptor, Object value, Modifiers modifiers) throws UtilEvalError {
+    //     this( name, (Class<?>) null/*type*/, value, modifiers );
+    //     this.typeDescriptor = typeDescriptor;
+    // }
 
-    /**
-        @param value may be null if this
-    */
-    Variable( String name, Class<?> type, Object value, Modifiers modifiers )
-        throws UtilEvalError
-    {
+    // Variable(String name, Class<?> type, Modifiers modifiers) {
+    //     this.name = name;
+    //     this.type = type;
+    //     this.modifiers = modifiers;
+    // }
+
+    Variable(String name, Class<?> type, Object value, Modifiers modifiers) throws UtilEvalError {
         this.name=name;
         this.type = type;
-        this.setModifiers( modifiers );
-        this.setValue( value, DECLARATION );
+        this.modifiers = modifiers;
+        // this.setValue(value, DECLARATION);
+
+        // // prevent final variable re-assign
+        // if (hasModifier("final")) {
+        //     if (this.value != null)
+        //         throw new UtilEvalError("Cannot re-assign final variable "+name+".");
+        //     if (value == null)
+        //         return;
+        // }
+
+        // TODO: should add isJavaCastable() test for strictJava
+        // (as opposed to isJavaAssignable())
+        // if (type != null && type != Object.class && value != null) {
+        //     // final int ope = context == DECLARATION ? Types.CAST : Types.ASSIGNMENT;
+        //     this.value = Types.castObject(value, type, Types.CAST);
+        //     return;
+        // }
+
+        this.value = type != null && type != Object.class && value != null
+                        ? this.value = Types.castObject(value, type, Types.CAST)
+                        : value;
     }
 
+    public Object getValue() { return this.value; }
+
+    public Object setValue(Object value) throws UtilEvalError {
+        // this.setValue(value, DECLARATION);
+
+        // TODO: verificar melhor isso!
+        // prevent final variable re-assign
+        if (this.hasModifier("final")) {
+            if (this.value != null)
+                throw new UtilEvalError("Cannot re-assign final variable "+name+".");
+            if (value == null) // TODO: pq temos isso?
+                return null;
+        }
+
+        // TODO: should add isJavaCastable() test for strictJava
+        // (as opposed to isJavaAssignable())
+        if ( type != null && type != Object.class && value != null )
+            return this.value = Types.castObject(value, type, Types.ASSIGNMENT);
+        else
+            return this.value = this.value == null ? Primitive.getDefaultValue(type) : value;
+    }
+
+    // TODO: see it better!
     /**
         Set the value of the typed variable.
         @param value should be an object or wrapped bsh Primitive type.
         if value is null the appropriate default value will be set for the
         type: e.g. false for boolean, zero for integer types.
     */
-    public void setValue( Object value, int context )
-        throws UtilEvalError
-    {
+    // private void setValue(Object value, int context) throws UtilEvalError {
+    //     // prevent final variable re-assign
+    //     if (hasModifier("final")) {
+    //         if (this.value != null)
+    //             throw new UtilEvalError("Cannot re-assign final variable "+name+".");
+    //         if (value == null)
+    //             return;
+    //     }
 
-        // prevent final variable re-assign
-        if (hasModifier("final")) {
-            if (this.value != null)
-                throw new UtilEvalError("Cannot re-assign final variable "+name+".");
-            if (value == null)
-                return;
-        }
+    //     // TODO: should add isJavaCastable() test for strictJava
+    //     // (as opposed to isJavaAssignable())
+    //     if ( type != null && type != Object.class && value != null ) {
+    //         final int ope = context == DECLARATION ? Types.CAST : Types.ASSIGNMENT;
+    //         this.value = Types.castObject(value, type, ope);
+    //         return;
+    //     }
 
-        // TODO: should add isJavaCastable() test for strictJava
-        // (as opposed to isJavaAssignable())
-        if ( type != null && type != Object.class && value != null ) {
-            this.value = Types.castObject( value, type,
-                context == DECLARATION ? Types.CAST : Types.ASSIGNMENT
-            );
-            value = this.value;
-        }
+    //     this.value = this.value == null && context != DECLARATION ? Primitive.getDefaultValue(type) : value;
+    // }
 
-        this.value = value;
-
-        if ( this.value == null && context != DECLARATION )
-            this.value = Primitive.getDefaultValue( type );
-
-        if ( lhs != null )
-            this.value = lhs.assign( this.value, false/*strictjava*/ );
-
-    }
-
-    void validateFinalIsSet(boolean isStatic) {
-        if (!hasModifier("final") || this.value != null)
-            return;
-        if (isStatic == hasModifier("static"))
-            throw new RuntimeException((isStatic ? "Static f" : "F")
-                    +"inal variable "+name+" is not initialized.");
-    }
-
-    /*
-        Note: UtilEvalError here comes from lhs.getValue().
-        A Variable can represent an LHS for the case of an imported class or
-        object field.
-    */
-    Object getValue() throws UtilEvalError {
-        if ( lhs != null )
-            return type == null ?
-                lhs.getValue() : Primitive.wrap( lhs.getValue(), type );
-
-        return value;
-    }
+    // void validateFinalIsSet(boolean isStatic) {
+    //     if (!hasModifier("final") || this.value != null)
+    //         return;
+    //     if (isStatic == hasModifier("static"))
+    //         throw new RuntimeException((isStatic ? "Static f" : "F")
+    //                 +"inal variable "+name+" is not initialized.");
+    // }
 
     public String getName() { return name; }
-    public Class<?> getType() { return type;   }
+    public Class<?> getType() { return type; } // TODO: talvez adicionar um Types.getType(this.value) aqui ?
 
-    public String getTypeDescriptor() {
-        if (null == typeDescriptor)
-            typeDescriptor = BSHType.getTypeDescriptor(
-                type == null ? Object.class : type);
-        return typeDescriptor;
-    }
+    // public String getTypeDescriptor() {
+    //     if (null == typeDescriptor)
+    //         typeDescriptor = Type.getDescriptor(type == null ? Object.class : type);
+    //     return typeDescriptor;
+    // }
 
     public Modifiers getModifiers() {
-        if (modifiers == null)
-            this.setModifiers(new Modifiers(Modifiers.FIELD));
+        if (this.modifiers == null)
+            this.modifiers = new Modifiers(Modifiers.FIELD);
         return this.modifiers;
     }
 
-    private void setModifiers(Modifiers modifiers) {
-        this.modifiers = modifiers;
-    }
+    // private void setModifiers(Modifiers modifiers) {
+    //     this.modifiers = modifiers;
+    // }
 
-
-    public boolean hasModifier( String name ) {
+    public boolean hasModifier(String name) {
         return getModifiers().hasModifier(name);
     }
 
@@ -166,15 +177,15 @@ public class Variable implements Serializable, BshClassManager.Listener
     }
 
     public String toString() {
-        return "Variable: " + StringUtil.variableString(this)
-                + ", value:" + value + ", lhs = " + lhs;
+        return "Variable: " + StringUtil.variableString(this) + ", value:" + value /*+ ", lhs = " + lhs*/;
     }
 
     /** {@inheritDoc} */
     @Override
     public void classLoaderChanged() {
-        if (Reflect.isGeneratedClass(type)) try {
-            type = Reflect.getThisNS(type).getClass(type.getName());
-        } catch (UtilEvalError e) { /** should not happen on reload */ }
+        // TODO: see it!
+        // if (Reflect.isGeneratedClass(type)) try {
+        //     type = Reflect.getThisNS(type).getClass(type.getName());
+        // } catch (UtilEvalError e) { /** should not happen on reload */ }
     }
 }

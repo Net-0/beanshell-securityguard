@@ -24,12 +24,9 @@
  *                                                                           *
  *****************************************************************************/
 
-
-
 package bsh;
 
-class BSHImportDeclaration extends SimpleNode
-{
+class BSHImportDeclaration extends SimpleNode {
     private static final long serialVersionUID = 1L;
     public boolean importPackage;
     public boolean staticImport;
@@ -37,64 +34,37 @@ class BSHImportDeclaration extends SimpleNode
 
     BSHImportDeclaration(int id) { super(id); }
 
-    public Object eval(CallStack callstack, Interpreter interpreter)
-        throws EvalError
-    {
-        NameSpace namespace = callstack.top();
-        if ( superImport ) try {
-            namespace.doSuperImport();
-        } catch ( UtilEvalError e ) {
-            throw e.toEvalError( this, callstack  );
-        }
-        else {
-            BSHAmbiguousName ambigName = (BSHAmbiguousName) jjtGetChild(0);
-            if ( staticImport ) {
-                if ( importPackage ) {
-                    // import all (*) static members
-                    Class<?> clas = ambigName.toClass( callstack, interpreter );
-                    namespace.importStatic( clas );
-                } else {
-                    Object obj = null;
-                    Class<?> clas = null;
-                    String name = Name.suffix(ambigName.text, 1);
-                    try { // import static method from class
-                        clas = namespace.getClass(Name.prefix(ambigName.text));
-                        obj = Reflect.staticMethodImport(clas, name);
-                    } catch (Exception e) { /* ignore try field instead */ }
-                    try { // import static field from class
-                        if (null != clas && null == obj)
-                            obj = Reflect.getLHSStaticField(clas, name);
-                    } catch (Exception e) { /* ignore try method instead */ }
-                    try { // import static method from Name
-                        if (null == obj)
-                            obj = ambigName.toObject( callstack, interpreter );
-                    } catch (Exception e) { /* ignore try field instead */ }
-                    // do we have a method
-                    if ( obj instanceof BshMethod ) {
-                        namespace.setMethod( (BshMethod) obj );
-                        return Primitive.VOID;
-                    }
-                    if ( !(obj instanceof LHS) )
-                        // import static field from Name
-                        obj = ambigName.toLHS( callstack, interpreter );
-                    // do we have a field
-                    if ( obj instanceof LHS && ((LHS) obj).isStatic() ) {
-                        namespace.setVariableImpl( ((LHS) obj).getVariable() );
-                        return Primitive.VOID;
-                    }
-                    // no static member found
-                    throw new EvalException(ambigName.text
-                                        + " is not a static member of a class",
-                                        this, callstack );
-                }
-            } else { // import package
-                String name = ambigName.text;
-                if ( importPackage )
-                    namespace.importPackage(name);
-                else
-                    namespace.importClass(name);
+    public Object eval(final CallStack callStack, final Interpreter interpreter) throws EvalError {
+        final NameSpace nameSpace = callStack.top();
+        // TODO: how improve super import ?
+        if (superImport) {
+            if (interpreter.getStrictJava())
+                throw new EvalError("Super import is not java strict!", this, callStack);
+
+            try {
+                nameSpace.doSuperImport();
+            } catch ( UtilEvalError e ) {
+                throw e.toEvalError( this, callStack  );
             }
+
+            return Primitive.VOID;
         }
+
+        final String name = ((BSHName) this.jjtGetChild(0)).name;
+
+        // TODO: rever os imports static: mudar a implementação e remover os códigos antigos
+        if (staticImport) {
+            if (importPackage)
+                nameSpace.importStaticClass(name);
+            else
+                nameSpace.importStaticMember(name);
+        } else { // import package
+            if (importPackage)
+                nameSpace.importPackage(name);
+            else
+                nameSpace.importClass(name);
+        }
+
         return Primitive.VOID;
     }
 

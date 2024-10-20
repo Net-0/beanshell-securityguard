@@ -1,5 +1,18 @@
 package bsh.engine;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.io.Reader;
+import java.io.UnsupportedEncodingException;
+import java.io.Writer;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CoderResult;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+
 import javax.script.AbstractScriptEngine;
 import javax.script.Bindings;
 import javax.script.Compilable;
@@ -18,19 +31,6 @@ import bsh.NameSpace;
 import bsh.ParseException;
 import bsh.PreparsedScript;
 import bsh.TargetError;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintStream;
-import java.io.Reader;
-import java.io.UnsupportedEncodingException;
-import java.io.Writer;
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CoderResult;
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
 
 /*
     Adopted from http://ikayzo.org/svn/beanshell/BeanShell/engine/src/bsh/engine/BshScriptEngine.java
@@ -266,24 +266,26 @@ public class BshScriptEngine extends AbstractScriptEngine implements Compilable,
      */
     @Override
     public Object invokeMethod(Object thiz, String name, Object... args) throws ScriptException, NoSuchMethodException {
-        if (!(thiz instanceof bsh.This)) {
-            throw new ScriptException("Illegal object type: " + (null == thiz ? "null" : thiz.getClass()));
-        }
+        // if (!(thiz instanceof bsh.This)) {
+        //     throw new ScriptException("Illegal object type: " + (null == thiz ? "null" : thiz.getClass()));
+        // }
 
-        bsh.This bshObject = (bsh.This) thiz;
+        // bsh.This bshObject = (bsh.This) thiz;
 
-        try {
-            return bshObject.invokeMethod(name, args);
-        } catch (TargetError e) {
-            // The script threw an application level exception
-            // set it as the cause ?
-            ScriptException se = new ScriptException(e.toString(), e.getErrorSourceFile(), e.getErrorLineNumber());
-            se.initCause(e.getTarget());
-            throw se;
-        } catch (EvalError e) {
-            // The script couldn't be evaluated properly
-            throw new ScriptException(e.toString(), e.getErrorSourceFile(), e.getErrorLineNumber());
-        }
+        // try {
+        //     return bshObject.invokeMethod(name, args);
+        // } catch (TargetError e) {
+        //     // The script threw an application level exception
+        //     // set it as the cause ?
+        //     ScriptException se = new ScriptException(e.toString(), e.getErrorSourceFile(), e.getErrorLineNumber());
+        //     se.initCause(e.getTarget());
+        //     throw se;
+        // } catch (EvalError e) {
+        //     // The script couldn't be evaluated properly
+        //     throw new ScriptException(e.toString(), e.getErrorSourceFile(), e.getErrorLineNumber());
+        // }
+        // TODO: ver isso!
+        throw new RuntimeException("Not implemented yet!");
     }
 
 
@@ -304,7 +306,7 @@ public class BshScriptEngine extends AbstractScriptEngine implements Compilable,
         return invokeMethod(getGlobal(), name, args);
     }
 
-
+    // TODO: ver isso
     /**
      * Returns an implementation of an interface using procedures compiled in the
      * interpreter. The methods of the interface may be implemented using the
@@ -320,7 +322,9 @@ public class BshScriptEngine extends AbstractScriptEngine implements Compilable,
      */
     @Override
     public <T> T getInterface(Class<T> clasz) {
-        return clasz.cast(getGlobal().getInterface(clasz));
+        // TODO: ver isso
+        throw new RuntimeException("Not implemented yet!");
+        // return clasz.cast(getGlobal().getInterface(clasz));
     }
 
 
@@ -342,18 +346,24 @@ public class BshScriptEngine extends AbstractScriptEngine implements Compilable,
      */
     @Override
     public <T> T getInterface(Object thiz, Class<T> clasz) {
-        if (!(thiz instanceof bsh.This)) {
-            throw new IllegalArgumentException("Illegal object type: " + (null == thiz ? "null" : thiz.getClass()));
-        }
+        // if (!(thiz instanceof bsh.This)) {
+        //     throw new IllegalArgumentException("Illegal object type: " + (null == thiz ? "null" : thiz.getClass()));
+        // }
 
-        bsh.This bshThis = (bsh.This) thiz;
-        return clasz.cast(bshThis.getInterface(clasz));
+        // bsh.This bshThis = (bsh.This) thiz;
+        // return clasz.cast(bshThis.getInterface(clasz));
+
+        // TODO: see it
+        throw new RuntimeException("Not implemented yet!");
     }
 
 
     private bsh.This getGlobal() {
-        // requires 2.0b5 to make getThis() public
-        return getEngineNameSpace(getContext()).getThis(getInterpreter());
+        // // requires 2.0b5 to make getThis() public
+        // return getEngineNameSpace(getContext()).getThis(getInterpreter());
+
+        // TODO: see it
+        throw new RuntimeException("Not implemented yet!");
     }
 
     /*

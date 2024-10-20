@@ -50,6 +50,9 @@ if ( true )
   assert( blockthis == ths );
 }
 
+// TODO: como o 'this' funciona para BshLocalMethod dentro de BshMethod ?
+// TODO: teste para dar erro quando seta this -> this = 10;
+
 void method1()
 {
   assert( !(this.namespace instanceof bsh.BlockNameSpace) );

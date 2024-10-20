@@ -18,26 +18,25 @@ package bsh;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BSHTryWithResources extends SimpleNode {
+// TODO: dar uma olhada nessa classe dps
+class BSHTryWithResources extends SimpleNode {
     private static final long serialVersionUID = 1L;
     public BSHTryWithResources(int id) { super(id); }
 
-    public Object eval( CallStack callstack, Interpreter interpreter)
-            throws EvalError {
-        for (int i=0; i < jjtGetNumChildren(); i++)
-            jjtGetChild(i).eval(callstack, interpreter);
-
+    public Object eval(CallStack callstack, Interpreter interpreter) throws EvalError {
+        for (final Node n: this.jjtGetChildren())
+            n.eval(callstack, interpreter);
         return Primitive.VOID;
     }
 
-    public List<Throwable> autoClose() {
+    protected List<Throwable> autoClose() {
         List<Throwable> thrown = new ArrayList<>();
-        for (int i=0; i < jjtGetNumChildren(); i++) try {
-            ((BSHAutoCloseable) jjtGetChild(i)).close();
-        } catch (Throwable e) {
-            thrown.add(e);
-        }
+        for (final Node n: this.jjtGetChildren())
+            try {
+                ((BSHAutoCloseable) n).close();
+            } catch (Throwable e) {
+                thrown.add(e);
+            }
         return thrown;
     }
 }
-/* JavaCC - OriginalChecksum=08f0fcca24c39792c40d25b047261c1c (do not edit this line) */

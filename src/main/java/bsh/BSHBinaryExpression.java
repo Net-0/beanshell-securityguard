@@ -37,16 +37,11 @@ class BSHBinaryExpression extends SimpleNode implements ParserConstants {
 
     BSHBinaryExpression(int id) { super(id); }
 
-    public Object eval( CallStack callstack, Interpreter interpreter)
-        throws EvalError
-    {
+    public Object eval( CallStack callstack, Interpreter interpreter) throws EvalError {
         Object lhs = jjtGetChild(0).eval(callstack, interpreter);
 
-        /*
-            Doing instanceof?  Next node is a type.
-        */
-        if (kind == INSTANCEOF)
-        {
+        /* Doing instanceof?  Next node is a type. */
+        if (kind == INSTANCEOF) {
             // null object ref is not instance of any type
             if ( lhs == Primitive.NULL )
                 return Primitive.FALSE;
@@ -107,8 +102,8 @@ class BSHBinaryExpression extends SimpleNode implements ParserConstants {
         }
 
         // Handle null values and apply null rules.
-        lhs = checkNullValues(lhs, rhs, 0, callstack);
-        rhs = checkNullValues(rhs, lhs, 1, callstack);
+        lhs = checkNullValues(lhs, rhs, 0, callstack, interpreter.getStrictJava());
+        rhs = checkNullValues(rhs, lhs, 1, callstack, interpreter.getStrictJava());
 
         /*
             Are both the lhs and rhs either wrappers or primitive values?
@@ -147,16 +142,18 @@ class BSHBinaryExpression extends SimpleNode implements ParserConstants {
     /** Get Variable from namespace for value at specified index.
      * Used to identify the type of non-dynamic variables with null value.
      * @param index 0 for lhs val1 else 1
-     * @param callstack the evaluation call stack
+     * @param callStack the evaluation call stack
      * @return the variable in call stack name space for the ambiguous node text
      * @throws UtilEvalError thrown by getVariableImpl. */
-    private Variable getVariableAtNode(int index, CallStack callstack) throws UtilEvalError {
+    private Class<?> getVariableAtNode(int index, CallStack callStack, boolean strictJava) throws EvalError, UtilEvalError {
+        // TODO: ver melhor essa questão de tipagem, o ideal seria java.lang.Type para ter suporte à generics!
         Node nameNode = null;
-        if ( jjtGetChild(index).jjtGetNumChildren() > 0
-                && (nameNode = jjtGetChild(index).jjtGetChild(0))
-                    instanceof BSHAmbiguousName )
-            return callstack.top().getVariableImpl(
-                    ((BSHAmbiguousName) nameNode).text, true);
+        if (jjtGetChild(index).jjtGetNumChildren() > 0 && (nameNode = jjtGetChild(index).jjtGetChild(0)) instanceof BSHAmbiguousName) {
+            final NameSpace nameSpace = callStack.top();
+            final String name = ((BSHAmbiguousName) nameNode).name;
+            final Object value = Reflect.getNameSpaceVariable(nameSpace, name, callStack, strictJava);
+            return Types.getType(value);
+        }
         return null;
     }
 
@@ -167,36 +164,32 @@ class BSHBinaryExpression extends SimpleNode implements ParserConstants {
      * @param callstack the evaluation call stack
      * @return the value modified or not
      * @throws EvalError if operation cause an error */
-    private Object checkNullValues(Object val1, Object val2, int index,
-            CallStack callstack) throws EvalError {
+    private Object checkNullValues(Object val1, Object val2, int index, CallStack callstack, boolean strictJava) throws EvalError {
         if ( Primitive.NULL != val1 )
             return val1;
         if ( Primitive.VOID == val2 )
             return val1;
         try {
-            Variable var = null;
+            Class<?> varType = null;
             boolean val2IsString = val2 instanceof String;
             Class<?> val2Class = null;
             if ( Primitive.NULL == val2 ) {
-                if ( null != (var = getVariableAtNode(index ^ 1, callstack)) ) {
-                    val2IsString = var.getType() == String.class;
-                    val2Class = var.getType();
+                if ( null != (varType = getVariableAtNode(index ^ 1, callstack, strictJava)) ) {
+                    val2IsString = varType == String.class;
+                    val2Class = varType;
                 }
             } else
                 val2Class = Primitive.unwrap(val2).getClass();
-            if ( null == (var = getVariableAtNode(index, callstack)) )
+            if ( null == (varType = getVariableAtNode(index, callstack, strictJava)) )
                 return val1;
             if ( (kind == EQ || kind == NE)
-                    && isComparableTypes(var.getType(), val2Class, callstack) )
+                    && isComparableTypes(varType, val2Class, callstack) )
                 return val1;
-            if ( kind == PLUS && (val2IsString || var.getType() == String.class) )
+            if ( kind == PLUS && (val2IsString || varType == String.class) )
                 return "null";
-            if ( isWrapper(var.getType()) )
-                throw new NullPointerException(
-                        "null value with binary operator " + tokenImage[kind]);
-            throw new EvalException(
-                    "bad operand types for binary operator "
-                        + tokenImage[kind], this, callstack);
+            if ( isWrapper(varType) )
+                throw new NullPointerException("null value with binary operator " + tokenImage[kind]);
+            throw new EvalException("bad operand types for binary operator " + tokenImage[kind], this, callstack);
         } catch (NullPointerException e) {
             throw new TargetError(e, this, callstack);
         } catch (UtilEvalError e) {

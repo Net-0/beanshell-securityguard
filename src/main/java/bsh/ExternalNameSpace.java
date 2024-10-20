@@ -25,8 +25,13 @@
  *****************************************************************************/
 package bsh;
 
+import java.lang.reflect.Type;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.stream.Stream;
 
 
@@ -70,32 +75,20 @@ import java.util.stream.Stream;
     overloaded forms (perhaps a map by method SignatureKey).
 
 */
-public class ExternalNameSpace extends NameSpace
-{
+public class ExternalNameSpace extends NameSpace {
     private Map<String,Object> externalMap;
 
-    public ExternalNameSpace()
-    {
-        this( null, "External Map Namespace", null );
+    public ExternalNameSpace() {
+        this(null, "External Map Namespace", null);
     }
 
-    /**
-    */
-    public ExternalNameSpace( NameSpace parent, String name, Map<String,Object> externalMap )
-    {
-        super( parent, name );
-
-        if ( externalMap == null )
-            externalMap = new HashMap<String,Object>();
-
-        this.externalMap = externalMap;
-
+    public ExternalNameSpace(NameSpace parent, String name, Map<String,Object> externalMap) {
+        super(parent, name);
+        this.externalMap = externalMap == null ? new HashMap<>() : externalMap;
     }
 
-    /**
-        Get the map view of this namespace.
-    */
-    public Map<String,Object> getMap() { return externalMap; }
+    /** Get the map view of this namespace. */
+    public Map<String,Object> getMap() { return this.externalMap; }
 
     /**
         Set the external Map which to which this namespace synchronizes.
@@ -103,106 +96,145 @@ public class ExternalNameSpace extends NameSpace
         map values are retained in the external map, but are removed from the
         BeanShell namespace.
     */
-    public void setMap( Map<String,Object> map )
-    {
+    public void setMap(Map<String,Object> map) {
         // Detach any existing namespace to preserve it, then clear this
         // namespace and set the new one
-        clear();
-        this.externalMap = map ;
+        this.clear();
+        this.externalMap = map;
     }
 
-    /**
-    */
-    public void unsetVariable( String name )
-    {
-        super.unsetVariable( name );
-        externalMap.remove( name );
+    @Override
+    public Object getLocalVariable(String name) throws NoSuchElementException {
+        return this.externalMap.get(name);
     }
 
-    /**
-    */
-    public String [] getVariableNames()
-    {
-        return Stream.concat(
-                Stream.of(super.getVariableNames()),
-                this.externalMap.keySet().stream()
-            ).toArray(String[]::new);
+    @Override
+    public Object setLocalVariable(String name, Class<?> type, Object value, Modifiers mods) throws UtilEvalError {
+        return this.externalMap.put(name, value);
     }
 
-    /**
-    */
-    /*
-        Notes: This implementation of getVariableImpl handles the following
-        cases:
-        1) var in map not in local scope - var was added through map
-        2) var in map and in local scope - var was added through namespace
-        3) var not in map but in local scope - var was removed via map
-        4) var not in map and not in local scope - non-existent var
-
-        Note: It would seem that we could simply override getImportedVar()
-        in NameSpace, rather than this higher level method.  However we need
-        more control here to change the import precedence and remove variables
-        if they are removed via the extenal map.
-    */
-        protected Variable getVariableImpl( String name, boolean recurse )
-        throws UtilEvalError
-    {
-        // check the external map for the variable name
-        Object value = externalMap.get( name );
-
-        if ( value == null && externalMap.containsKey( name ) )
-            value = Primitive.NULL;
-
-        Variable var;
-        if ( value == null )
-        {
-            // The var is not in external map and it should therefore not be
-            // found in local scope (it may have been removed via the map).
-            // Clear it prophalactically.
-            super.unsetVariable( name );
-
-            // Search parent for var if applicable.
-            var = super.getVariableImpl( name, recurse );
-        } else
-        {
-            // Var in external map may be found in local scope with type and
-            // modifier info.
-            Variable localVar = super.getVariableImpl( name, false );
-
-            // If not in local scope then it was added via the external map,
-            // we'll wrap it and pass it along.  Else we'll use the one we
-            // found.
-            if ( localVar == null )
-                var = createVariable( name, null/*type*/, value, null/*mods*/ );
-            else
-                var = localVar;
-        }
-
-        return var;
+    // TODO: ver esses métodos!
+    @Override
+    protected ExternalNameSpace clone() {
+        final ExternalNameSpace clone = (ExternalNameSpace) super.clone();
+        clone.externalMap = new HashMap<>(this.externalMap);
+        return clone;
     }
 
-    public Variable createVariable(
-        String name, Class type, Object value, Modifiers mods )
-    {
-        LHS lhs = new LHS( externalMap, name );
-        // Is this race condition worth worrying about?
-        // value will appear in map before it's really in the interpreter
-        try {
-            lhs.assign( value, false/*strict*/ );
-        } catch ( UtilEvalError e) {
-            throw new InterpreterError( e.toString() );
-        }
-        return new Variable( name, type, lhs );
+    // // TODO: ver isso
+    // @Override
+    // protected void getAllNamesAux(List<String> vec) { super.getAllNamesAux(vec); }
+
+    // @Override
+    // public Class<?> getClass(String name) {
+    //     // TODO Auto-generated method stub
+    //     return super.getClass(name);
+    // }
+
+    // @Override
+    // protected Variable getVariableImpl(String name, boolean recurse) throws UtilEvalError {
+    //     // TODO Auto-generated method stub
+    //     return super.getVariableImpl(name, recurse);
+    // }
+
+    @Override
+    public void unsetVariable(String name) {
+        super.unsetVariable(name);
+        this.externalMap.remove(name);
     }
+
+    // TODO: ver isso
+    @Override
+    public String[] getAllNames() {
+        return ExternalNameSpace.concatNames(super.getAllNames(), this.externalMap.keySet());
+    }
+
+    // TODO: testar isso!
+    @Override
+    public String[] getVariableNames() {
+        return ExternalNameSpace.concatNames(super.getVariableNames(), this.externalMap.keySet());
+    }
+
+    private static final String[] concatNames(final String[] names1, final Set<String> names2) {
+        final String[] names = new String[names1.length + names2.size()];
+        names2.toArray(names); // Copy into the begin of 'names'
+        System.arraycopy(names1, 0, names, names2.size(), names1.length); // Copy into the end of 'names'
+        return names;
+    }
+
+    // /*
+    //     Notes: This implementation of getVariableImpl handles the following
+    //     cases:
+    //     1) var in map not in local scope - var was added through map
+    //     2) var in map and in local scope - var was added through namespace
+    //     3) var not in map but in local scope - var was removed via map
+    //     4) var not in map and not in local scope - non-existent var
+
+    //     Note: It would seem that we could simply override getImportedVar()
+    //     in NameSpace, rather than this higher level method.  However we need
+    //     more control here to change the import precedence and remove variables
+    //     if they are removed via the extenal map.
+    // */
+    // protected Variable getVariableImpl(String name, boolean recurse) throws UtilEvalError {
+    //     // check the external map for the variable name
+    //     Object value = this.externalMap.get(name);
+
+    //     if (value == null && this.externalMap.containsKey(name))
+    //         value = Primitive.NULL;
+
+    //     // Variable var;
+    //     if (value == null) {
+    //         // The var is not in external map and it should therefore not be
+    //         // found in local scope (it may have been removed via the map).
+    //         // Clear it prophalactically.
+    //         super.unsetVariable(name);
+
+    //         // Search parent for var if applicable.
+    //         // var = super.getVariableImpl(name, recurse);
+    //         return super.getVariableImpl(name, recurse);
+    //     } else {
+    //         // Var in external map may be found in local scope with type and
+    //         // modifier info.
+    //         Variable localVar = super.getVariableImpl(name, false);
+
+    //         // If not in local scope then it was added via the external map,
+    //         // we'll wrap it and pass it along.  Else we'll use the one we
+    //         // found.
+    //         // if ( localVar == null )
+    //         //     var = createVariable( name, null/*type*/, value, null/*mods*/ );
+    //         // else
+    //         //     var = localVar;
+    //         return localVar == null ? createVariable(name, null, value, null) : localVar;
+    //     }
+
+    //     // return var;
+    // }
+
+    // private static final CallStack EMPTY_STACK = new CallStack();
+
+    // @Override
+    // protected Variable createVariable(String name, Class<?> type, Object value, Modifiers mods) {
+    //     // TODO: o strictJava deveria ser apenas 'false' mesmo ?
+    //     LHS lhs = new LHS(externalMap, name, EMPTY_STACK, false);
+    //     // Is this race condition worth worrying about?
+    //     // value will appear in map before it's really in the interpreter
+    //     try {
+    //         lhs.assign(value);
+    //     } catch ( UtilEvalError e) {
+    //         throw new InterpreterError(e.toString());
+    //     }
+    //     return new Variable(name, type, lhs);
+
+    //     return new VariableProxy(this.externalMap, name, type, value, mods);
+    // }
 
     /**
         Clear all variables, methods, and imports from this namespace and clear
         all values from the external map (via Map clear()).
     */
-    public void clear()
-    {
+    public void clear() {
         super.clear();
-        externalMap.clear();
+        this.externalMap.clear();
     }
 
 }

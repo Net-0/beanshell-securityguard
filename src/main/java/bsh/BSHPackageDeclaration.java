@@ -40,9 +40,9 @@ public class BSHPackageDeclaration extends SimpleNode
     {
         BSHAmbiguousName name = (BSHAmbiguousName)jjtGetChild(0);
         NameSpace namespace = callstack.top();
-        namespace.setPackage( name.text );
+        namespace.setPackage( name.name );
         // import the package we're in by default...
-        namespace.importPackage( name.text );
+        namespace.importPackage( name.name );
         return Primitive.VOID;
     }
 }

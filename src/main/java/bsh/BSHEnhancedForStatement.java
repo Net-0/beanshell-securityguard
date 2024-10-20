@@ -47,45 +47,44 @@ class BSHEnhancedForStatement extends SimpleNode implements ParserConstants {
         blockId = BlockNameSpace.blockCount.incrementAndGet();
     }
 
-
-    public Object eval(CallStack callstack, Interpreter interpreter) throws EvalError {
+    public Object eval(CallStack callStack, Interpreter interpreter) throws EvalError {
         Modifiers modifiers = new Modifiers(Modifiers.PARAMETER);
         if (this.isFinal)
             modifiers.addModifier("final");
         Class<?> elementType = null;
         final Node expression;
         final Node statement;
-        final NameSpace enclosingNameSpace = callstack.top();
+        final NameSpace enclosingNameSpace = callStack.top();
         final Node firstNode = jjtGetChild(0);
         final int nodeCount = jjtGetNumChildren();
         if (firstNode instanceof BSHType) {
-            elementType = ((BSHType) firstNode).getType(callstack, interpreter);
+            elementType = ((BSHType) firstNode).getType(callStack, interpreter);
             expression = jjtGetChild(1);
             statement = nodeCount > 2 ? jjtGetChild(2) : null;
         } else {
             expression = firstNode;
             statement = nodeCount > 1 ? jjtGetChild(1) : null;
         }
-        final Object iteratee = expression.eval(callstack, interpreter);
+        final Object iteratee = expression.eval(callStack, interpreter);
         final CollectionManager cm = CollectionManager.getCollectionManager();
         final Iterator<?> iterator = cm.getBshIterator(iteratee);
         try {
+            // TODO: e a tipagem aqui ? como fica ? também podemos ter 2 assinaturas de array na variável do for ?
             while ( !Thread.interrupted() && iterator.hasNext() ) {
                 try {
-                    NameSpace eachNameSpace = BlockNameSpace.getInstance(enclosingNameSpace, blockId);
-                    callstack.swap(eachNameSpace);
+                    BlockNameSpace eachNameSpace = BlockNameSpace.getInstance(enclosingNameSpace, blockId);
+                    callStack.swap(eachNameSpace);
                     Object value = iterator.next();
                     if ( value == null ) value = Primitive.NULL;
-                    eachNameSpace.setTypedVariable(
-                        varName, elementType, value, modifiers);
-                } catch ( UtilEvalError e ) {
-                    throw e.toEvalError(
-                        "for loop iterator variable:"+ varName, this, callstack );
+                    eachNameSpace.setLocalVariable(varName, elementType, value, modifiers);
+                } catch (UtilEvalError e) {
+                    throw e.toEvalError("for loop iterator variable:"+ varName, this, callStack);
                 }
+
                 if (statement == null) continue; // not empty statement
                 Object ret = statement instanceof BSHBlock
-                    ? ((BSHBlock)statement).eval(callstack, interpreter, null)
-                    : statement.eval(callstack, interpreter);
+                    ? ((BSHBlock)statement).eval(callStack, interpreter, null)
+                    : statement.eval(callStack, interpreter);
                 if (ret instanceof ReturnControl) {
                     ReturnControl control = (ReturnControl)ret;
 
@@ -102,7 +101,7 @@ class BSHEnhancedForStatement extends SimpleNode implements ParserConstants {
             }
             return Primitive.VOID;
         } finally {
-            callstack.swap(enclosingNameSpace);
+            callStack.swap(enclosingNameSpace);
         }
     }
 

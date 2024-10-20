@@ -35,23 +35,23 @@ public class FilteredTestRunner extends BlockJUnit4ClassRunner {
     }
 
 
-    @Override
-    protected void runChild(final FrameworkMethod method, RunNotifier notifier) {
-        Description description= describeChild(method);
-        final Category category = method.getAnnotation(Category.class);
-        if (category != null) {
-            final Class<?>[] value = category.value();
-            for (final Class<?> categoryClass : value) {
-                if (TestFilter.class.isAssignableFrom(categoryClass)) {
-                    final TestFilter testFilter = (TestFilter) Reflect.getNewInstance(categoryClass);
-                    if (testFilter.skip()) {
-                        notifier.fireTestIgnored(description);
-//                            System.out.println("skipping test " + method.getMethod() + " due filter " + categoryClass.getSimpleName());
-                        return;
-                    }
-                }
-            }
-        }
-        runLeaf(methodBlock(method), description, notifier);
-    }
+//     @Override
+//     protected void runChild(final FrameworkMethod method, RunNotifier notifier) {
+//         Description description= describeChild(method);
+//         final Category category = method.getAnnotation(Category.class);
+//         if (category != null) {
+//             final Class<?>[] value = category.value();
+//             for (final Class<?> categoryClass : value) {
+//                 if (TestFilter.class.isAssignableFrom(categoryClass)) {
+//                     final TestFilter testFilter = (TestFilter) Reflect.getNewInstance(categoryClass);
+//                     if (testFilter.skip()) {
+//                         notifier.fireTestIgnored(description);
+// //                            System.out.println("skipping test " + method.getMethod() + " due filter " + categoryClass.getSimpleName());
+//                         return;
+//                     }
+//                 }
+//             }
+//         }
+//         runLeaf(methodBlock(method), description, notifier);
+//     }
 }

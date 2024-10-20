@@ -121,19 +121,16 @@ public class EvalError extends Exception
             return "<unknown file>";
     }
 
-    public String getScriptStackTrace()
-    {
-        if ( callstack == null )
+    public String getScriptStackTrace() {
+        if (callstack == null)
             return "<Unknown>";
 
         String trace = "";
         CallStack stack = callstack.copy();
-        while ( stack.depth() > 0 )
-        {
+        while (stack.depth() > 0) {
             NameSpace ns = stack.pop();
             Node node = ns.getNode();
-            if ( ns.isMethod )
-            {
+            if (ns.isMethod) {
                 trace = trace + "\nCalled from method: " + ns.getName();
                 if ( node != null )
                     trace += " : at Line: "+ node.getLineNumber()

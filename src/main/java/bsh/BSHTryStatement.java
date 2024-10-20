@@ -30,37 +30,31 @@ package bsh;
 import java.util.ArrayList;
 import java.util.List;
 
-
-class BSHTryStatement extends SimpleNode
-{
+class BSHTryStatement extends SimpleNode {
     final int blockId;
     BSHTryWithResources tryWithResources = null;
 
-    BSHTryStatement(int id)
-    {
+    BSHTryStatement(int id) {
         super(id);
         blockId = BlockNameSpace.blockCount.incrementAndGet();
     }
 
-    public Object eval( CallStack callstack, Interpreter interpreter)
-        throws EvalError
-    {
+    // TODO: tlvz sismplificar esse método ?
+    public Object eval(CallStack callStack, Interpreter interpreter) throws EvalError {
         int i = 0;
 
         if (jjtGetChild(i) instanceof BSHTryWithResources) {
             this.tryWithResources = ((BSHTryWithResources) jjtGetChild(i++));
-            this.tryWithResources.eval(callstack, interpreter);
+            this.tryWithResources.eval(callStack, interpreter);
         }
 
-        BSHBlock tryBlock = (BSHBlock) jjtGetChild(i++);
-
+        BSHBlock tryBlock = this.jjtGetChild(i++);
         List<BSHMultiCatch> catchParams = new ArrayList<>();
         List<BSHBlock> catchBlocks = new ArrayList<>();
 
         int nchild = jjtGetNumChildren();
         Node node = null;
-        while( i < nchild && (node = jjtGetChild(i++)) instanceof BSHMultiCatch )
-        {
+        while (i < nchild && (node = jjtGetChild(i++)) instanceof BSHMultiCatch) {
             catchParams.add((BSHMultiCatch) node);
             catchBlocks.add((BSHBlock) jjtGetChild(i++));
             node = null;
@@ -83,28 +77,28 @@ class BSHTryStatement extends SimpleNode
             Note: we the stack info... what do we do with it?  append
             to exception message?
         */
-        int callstackDepth = callstack.depth();
+        int callstackDepth = callStack.depth();
         try {
             Interpreter.debug("Evaluate try block");
             try {
-                ret = tryBlock.eval(callstack, interpreter);
+                ret = tryBlock.eval(callStack, interpreter);
             } catch ( OutOfMemoryError ome ) {
-                throw new TargetError(ome.toString(), ome, tryBlock, callstack, false);
+                throw new TargetError(ome.toString(), ome, tryBlock, callStack, false);
             }
         }
         catch( TargetError e ) {
             Interpreter.debug("TargetError from try block: ", e);
             thrown = e.getTarget();
             // clean up call stack grown due to exception interruption
-            while ( callstack.depth() > callstackDepth )
-                callstack.pop();
+            while ( callStack.depth() > callstackDepth )
+                callStack.pop();
         }
         catch( EvalException e ) {
             Interpreter.debug("EvalException from try block: ", e);
             thrown = e;
             // clean up call stack grown due to exception interruption
-            while ( callstack.depth() > callstackDepth )
-                callstack.pop();
+            while ( callStack.depth() > callstackDepth )
+                callStack.pop();
         } finally {
             // unwrap the target error
             while ( null != thrown && thrown.getCause() instanceof TargetError )
@@ -123,24 +117,22 @@ class BSHTryStatement extends SimpleNode
 
         // If we have an exception, find a catch
         try {
-            if (thrown != null)
-            {
+            if (thrown != null) {
                 Interpreter.debug("Try catch thrown: ", thrown);
                 Class<?> thrownType = thrown.getClass();
                 int n = catchParams.size();
-                for(i=0; i<n; i++)
-                {
+                for (i=0; i<n; i++) {
                     // Get catch block
                     BSHMultiCatch mc = catchParams.get(i);
                     Modifiers modifiers = new Modifiers(Modifiers.PARAMETER);
                     if (mc.isFinal())
                         modifiers.addModifier("final");
 
-                    mc.eval( callstack, interpreter );
+                    mc.eval( callStack, interpreter );
 
                     if ( mc.isUntyped() && interpreter.getStrictJava() )
                         throw new EvalException(
-                            "(Strict Java) Untyped catch block", this, callstack );
+                            "(Strict Java) Untyped catch block", this, callStack );
 
                     // If the param is typed check assignability
                     Class<?> mcType = null;
@@ -161,29 +153,28 @@ class BSHTryStatement extends SimpleNode
                     // We must create a new BlockNameSpace to hold the catch
                     // parameter and swap it on the stack after initializing it.
 
-                    NameSpace enclosingNameSpace = callstack.top();
-                    BlockNameSpace cbNameSpace = new BlockNameSpace(callstack.top(), blockId);
+                    NameSpace enclosingNameSpace = callStack.top();
+                    BlockNameSpace cbNameSpace = new BlockNameSpace(callStack.top(), blockId);
 
                     try {
                         if ( mcType == BSHMultiCatch.UNTYPED )
                             // set an untyped variable directly in the block
-                            cbNameSpace.setBlockVariable( mc.name, thrown );
+                            cbNameSpace.setBlockVariable(mc.name, thrown);
                         else
                             // set a typed variable (directly in the block)
-                            cbNameSpace.setTypedVariable(
-                                mc.name, mcType, thrown, modifiers);
+                            cbNameSpace.setLocalVariable(mc.name, mcType, thrown, modifiers);
                     } catch ( UtilEvalError e ) {
                         throw new InterpreterError(
                             "Unable to set var in catch block namespace." );
                     }
 
                     // put cbNameSpace on the top of the stack
-                    callstack.swap( cbNameSpace );
+                    callStack.swap( cbNameSpace );
                     try {
-                        ret = cb.eval( callstack, interpreter, true );
+                        ret = cb.eval( callStack, interpreter, true );
                     } finally {
                         // put it back
-                        callstack.swap( enclosingNameSpace );
+                        callStack.swap( enclosingNameSpace );
                     }
 
                     thrown = null;  // handled exception
@@ -193,14 +184,14 @@ class BSHTryStatement extends SimpleNode
         } finally {
             // evaluate finally block
             if( finallyBlock != null ) {
-                Object result = finallyBlock.eval(callstack, interpreter);
+                Object result = finallyBlock.eval(callStack, interpreter);
                 if( result instanceof ReturnControl )
                     return result;
             }
         }
         // exception fell through, throw it upward...
         if( null != thrown )
-            throw new TargetError(thrown, this, callstack);
+            throw new TargetError(thrown, this, callStack);
 
         // no exception return
         return ret instanceof ReturnControl ? ret : Primitive.VOID;

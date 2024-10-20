@@ -156,8 +156,8 @@ class SimpleNode implements Node, Serializable {
     }
 
     /** {@inheritDoc} */
-    @Override
-    public Node jjtGetChild(int i) { return children[i]; }
+    @Override // TODO: ver usos do jjtGetChild() q utilizavam cast para não usarem mais!
+    public <N extends Node> N jjtGetChild(int i) { return (N) children[i]; }
 
     /** {@inheritDoc} */
     @Override

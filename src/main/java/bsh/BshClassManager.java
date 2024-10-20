@@ -30,24 +30,22 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
+import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import bsh.internals.BshClass;
 import bsh.util.ReferenceCache;
-
-import static bsh.Reflect.isPublic;
-import static bsh.util.ReferenceCache.Type;
-import static bsh.Reflect.isPrivate;
-import static bsh.Reflect.isPackageAccessible;
-import static bsh.Reflect.isPackageScope;
-import static bsh.Capabilities.haveAccessibility;
+import bsh.util.ReferenceCache.Type;
 
 /**
     BshClassManager manages all classloading in BeanShell.
@@ -86,9 +84,17 @@ import static bsh.Capabilities.haveAccessibility;
     references in this package.
     <p>
 */
+
+
+
+
+// TODO: see this entire class
+// TODO: see the ClassManagerImpl
+
+
 public class BshClassManager {
     /** Class member soft key and soft value reference cache */
-    static final ReferenceCache<Class<?>, MemberCache> memberCache
+    protected static final ReferenceCache<Class<?>, MemberCache> memberCache
         = new ReferenceCache<Class<?>, MemberCache>(Type.Soft, Type.Soft, 50) {
             @Override
             protected MemberCache create(Class<?> key) {
@@ -98,10 +104,19 @@ public class BshClassManager {
 
     /** Class member cached value instance **/
     static final class MemberCache {
-        private final Map<String,List<Invocable>> cache
-                            = new ConcurrentHashMap<>();
-        private final Map<String,Invocable> fields
-                            = new ConcurrentHashMap<>();
+        // private final Map<String,List<Invocable>> cache = new ConcurrentHashMap<>();
+        // private final Map<String,Invocable> fields = new ConcurrentHashMap<>();
+        private final Class<?> _class;
+        // private final Class<?> superClass;
+
+        private final Constructor<?>[] constructors; // TODO: really need it?
+        private final Map<String, Field> fields = new HashMap<>();
+        private final Map<String, Field> staticFields = new HashMap<>();
+        private final Map<String, List<Method>> methods = new HashMap<>();
+        private final Map<String, List<Method>> staticMethods = new HashMap<>();
+
+        private final MemberCache superClassMemberCache; // Note: it holds a strong reference to the superClass MemberCache
+        private final MemberCache[] interfacesMemberCaches;
 
         /** Constructor iterates through interfaces and super classes
          * collect and cache field, constructor and method members.
@@ -111,206 +126,358 @@ public class BshClassManager {
          * Ensures the package is accessible, for default package we
          * import all non private otherwise public only unless have
          * accessibility is true.
-         * @param clazz for whom members are collected */
-        public MemberCache(Class<?> clazz) {
-            Class<?> type = clazz;
-            while (type != null) {
-                if (isPackageAccessible(type)
-                    && ((isPackageScope(type) && !isPrivate(type))
-                        || isPublic(type) || haveAccessibility())) {
-                    for (Field f : type.getDeclaredFields())
-                        if (isPublic(f) || haveAccessibility())
-                            cacheMember(Invocable.get(f));
-                    for (Method m : type.getDeclaredMethods())
-                        if (isPublic(m) || haveAccessibility())
-                            if (clazz == type) cacheMember(Invocable.get(m));
-                            else cacheMember(memberCache.get(type)
-                            .findMethod(m.getName(), m.getParameterTypes()));
-                    for (Constructor<?> c: type.getDeclaredConstructors())
-                        if (clazz == type) cacheMember(Invocable.get(c));
-                        else cacheMember(memberCache.get(type)
-                            .findMethod(c.getName(), c.getParameterTypes()));
+         * @param _class for whom members are collected */
+        public MemberCache(Class<?> _class) {
+            // TODO: ver o strictJava para os getter e setter dinâmicos
+            this._class = _class;
+            // this.superClass = _class.getSuperclass();
+
+            this.constructors = _class.getDeclaredConstructors();
+
+            for (Field field: _class.getDeclaredFields()) {
+                if (Reflect.isStatic(field)) {
+                    this.staticFields.put(field.getName(), field);
+                } else {
+                    this.fields.put(field.getName(), field);
                 }
-                processInterfaces(type.getInterfaces());
-                type = type.getSuperclass();
-                memberCache.init(type);
             }
-        }
 
-        /** Recursive processing of interfaces.
-         * Methods are stored by reference.
-         * @param interfaces for whom members are collected */
-        private void processInterfaces(Class<?>[] interfaces) {
-            for (Class<?> intr : interfaces) {
-                if (isPackageAccessible(intr)) {
-                    memberCache.init(intr);
-                    for (Field f : intr.getDeclaredFields())
-                            cacheMember(Invocable.get(f));
-                    for (Method m: intr.getDeclaredMethods())
-                        if (isPublic(m) || haveAccessibility())
-                            cacheMember(memberCache.get(intr)
-                            .findMethod(m.getName(), m.getParameterTypes()));
+            for (Method method: _class.getDeclaredMethods()) {
+                if (Reflect.isStatic(method)) {
+                    this.staticMethods.putIfAbsent(method.getName(), new ArrayList<>());
+                    this.staticMethods.get(method.getName()).add(method);
+                } else {
+                    this.methods.putIfAbsent(method.getName(), new ArrayList<>());
+                    this.methods.get(method.getName()).add(method);
                 }
-                processInterfaces(intr.getInterfaces());
             }
+
+            final Class<?> superClass = _class.getSuperclass();
+            this.superClassMemberCache = superClass != null ? BshClassManager.memberCache.get(superClass) : null;
+
+            final Class<?>[] interfaces = _class.getInterfaces();
+            this.interfacesMemberCaches = new MemberCache[interfaces.length];
+            for (Class<?> _interface: interfaces)
+                BshClassManager.memberCache.init(_interface);
+
+            for (int i = 0; i < interfaces.length; i++)
+                this.interfacesMemberCaches[i] = BshClassManager.memberCache.get(interfaces[i]);
+
+            // Class<?> type = clazz;
+            // while (type != null) {
+            //     if (isPackageAccessible(type)
+            //         && ((isPackageScope(type) && !isPrivate(type))
+            //             || isPublic(type) || haveAccessibility())) {
+            //         for (Field f : type.getDeclaredFields())
+            //             if (isPublic(f) || haveAccessibility())
+            //                 cacheMember(Invocable.get(f));
+            //         for (Method m : type.getDeclaredMethods())
+            //             if (isPublic(m) || haveAccessibility())
+            //                 if (clazz == type) cacheMember(Invocable.get(m));
+            //                 else cacheMember(memberCache.get(type)
+            //                 .findMethod(m.getName(), m.getParameterTypes()));
+            //         for (Constructor<?> c: type.getDeclaredConstructors())
+            //             if (clazz == type) cacheMember(Invocable.get(c));
+            //             else cacheMember(memberCache.get(type)
+            //                 .findMethod(c.getName(), c.getParameterTypes()));
+            //     }
+            //     processInterfaces(type.getInterfaces());
+            //     type = type.getSuperclass();
+            //     memberCache.init(type);
+            // }
         }
 
-        /** Cache a field member.
-         * @param member to cache
-         * @return true if this is a new member */
-        private boolean cacheMember(FieldAccess member) {
-            if (!hasField(member.getName()))
-                return null == fields.put(member.getName(), member);
-            return false;
+        // TODO: usar Type[] para argsTypes ?
+
+        // TODO: verificar melhor a questão do isGeneratedClass(), não deveriamos poder ver os métodos de literalmente qualquer classe!
+        private static boolean canAccessClass(Class<?> _class, NameSpace callingNS) {
+            return Reflect.isGeneratedClass(_class) || Reflect.isPublic(_class);
+            // final Class<?> declaringClass = member.getDeclaringClass();
+            // return Reflect.isPublic(member) ||                                                                  // Note: all public members are accessible
+            //        (Reflect.isProtected(member) && thisArg instanceof This && ((This) thisArg).isFromObject) || // Note: protected members are accessible when calling from 'this'
+            //        callingNS.inDeclaringClass(declaringClass) ||                                                // Note: any member is accessible from inside the declaring class
+            //        (Reflect.isGeneratedClass(declaringClass) && (Reflect.isPackagePrivate(member) || Reflect.isProtected(member)));              // Note: any method without an access modifier (package private) from a generated class is accessible
         }
 
-        /** Cache constructors and methods.
-         * Identifies properties and caches an additional cache entry
-         * referenced by property name, as defined by bean specification.
-         * @param member to cache
-         * @return true if the cache changed */
-        private boolean cacheMember(Invocable member) {
-            if (null == member) return false;
-            if (!member.isGetter() && !member.isSetter())
-                return cacheMember(member.getName(), member);
-            String name = member.getName();
-            String propName = name.replaceFirst("[gs]et|is", "");
-            if (propName.length() == 1 // double caps are skipped
-                    || Character.isLowerCase(name.charAt(1))) {
-                char[] ch = propName.toCharArray();
-                ch[0] = Character.toLowerCase(ch[0]);
-                propName = new String(ch);
+        private static boolean canAccessMember(Object thisArg, Member member, NameSpace callingNS) {
+            final Class<?> declaringClass = member.getDeclaringClass();
+            return Reflect.isPublic(member) ||                                                                                      // Note: all public members are accessible
+                   (Reflect.isProtected(member) && This.isObjectWrapper(thisArg)) ||                                                // Note: protected members are accessible when calling from 'this'
+                   callingNS.inDeclaringClass(declaringClass) ||                                                                    // Note: any member is accessible from inside the declaring class
+                   (Reflect.isGeneratedClass(declaringClass) && (Reflect.isPackagePrivate(member) || Reflect.isProtected(member))); // Note: any method without an access modifier (package private) from a generated class is accessible
+        }
+
+        private static boolean canAccessMember(Member member, NameSpace callingNS) {
+            final Class<?> declaringClass = member.getDeclaringClass();
+            return Reflect.isPublic(member) ||                                                                                      // Note: all public members are accessible
+                   callingNS.inDeclaringClass(declaringClass) ||                                                                    // Note: any member is accessible from inside the declaring class
+                   (Reflect.isGeneratedClass(declaringClass) && (Reflect.isPackagePrivate(member) || Reflect.isProtected(member))); // Note: any method without an access modifier (package private) of a generated class is accessible
+        }
+
+        // Note: return just a field that could be accessed ( based on Java Rules! )
+        public Field findField(Object thisArg, String fieldName, NameSpace callingNS) {
+            final Field field = this.fields.get(fieldName);
+            if (field != null && canAccessMember(thisArg, field, callingNS) && canAccessClass(this._class, callingNS)) return field;
+
+            return this.superClassMemberCache != null ? this.superClassMemberCache.findField(thisArg, fieldName, callingNS) : null;
+        }
+
+        public Field findStaticField(String fieldName, NameSpace callingNS) {
+            final Field field = this.staticFields.get(fieldName);
+            if (field != null && canAccessMember(field, callingNS) && canAccessClass(this._class, callingNS)) return field;
+
+            return this.superClassMemberCache != null ? this.superClassMemberCache.findStaticField(fieldName, callingNS) : null;
+        }
+
+        public Method findMethod(Object thisArg, String methodName, Class<?>[] argsTypes, NameSpace callingNS) {
+            List<Method> methods = new ArrayList<>();
+
+            // System.out.println("----------------------------------------------------------------");
+            // TODO: percorrer interfaces tb ??
+            for (MemberCache memberCache = this; memberCache != null; memberCache = memberCache.superClassMemberCache) {
+                // System.out.println("MemberCache.findMethod(): ");
+                // System.out.println(" - memberCache._class: " + memberCache._class);
+                // System.out.println(" - canAccessClass(memberCache._class, callingNS): " + canAccessClass(memberCache._class, callingNS));
+                // if (canAccessClass(memberCache._class, callingNS))
+                for (Method method: memberCache.methods.getOrDefault(methodName, Collections.emptyList())) {
+                    // System.out.println(" -- method: " + method);
+                    // System.out.println(" ----- canAccessMember(thisArg, method, callingNS): " + canAccessMember(thisArg, method, callingNS));
+                    if (canAccessMember(thisArg, method, callingNS))
+                        methods.add(method);
+                }
+
+                for (MemberCache interfaceMemberCache: memberCache.interfacesMemberCaches)
+                    for (MemberCache _memberCache = interfaceMemberCache; _memberCache != null; _memberCache = _memberCache.superClassMemberCache) {
+                        // System.out.println(" - _memberCache._class: " + _memberCache._class);
+                        for (Method method: _memberCache.methods.getOrDefault(methodName, Collections.emptyList())) {
+                            // System.out.println(" -- method: " + method);
+                            // System.out.println(" ----- canAccessMember(thisArg, method, callingNS): " + canAccessMember(thisArg, method, callingNS));
+                            if (canAccessMember(thisArg, method, callingNS))
+                                methods.add(method);
+                        }
+                    }
             }
-            return cacheMember(name, member)
-                && cacheMember(propName, member);
+
+            // System.out.println("methods: ");
+            // for (Method method: methods)
+            //     System.out.println(" - " + method);
+
+            // Method _found = Reflect.findMostSpecificInvocable(argsTypes, methods, Executable::getParameterTypes, Executable::isVarArgs);
+            // System.out.println("Reflect.findMostSpecificInvocable(): " + _found);
+            // System.out.println("Reflect.findMostSpecificInvocable().class: " + _found.getDeclaringClass());
+            // System.out.println("----------------------------------------------------------------");
+            return Reflect.findMostSpecificInvocable(argsTypes, methods, Executable::getParameterTypes, Executable::isVarArgs);
         }
 
-        /** Cache name associated with a list of members.
-         * @param name of member
-         * @param member invocable instance
-         * @return true if the cache changed */
-        private boolean cacheMember(String name, Invocable member) {
-            if (!hasMember(name))
-                return null == cache.put(name,
-                        Collections.singletonList(member));
-            else if (memberCount(name) == 1)
-                cache.put(name, new ArrayList<>(members(name)));
-            return members(name).add(member);
+        public Method findStaticMethod(String methodName, Class<?>[] argsTypes, NameSpace callingNS) {
+            List<Method> methods = new ArrayList<>();
+
+            for (MemberCache memberCache = this; memberCache != null; memberCache = memberCache.superClassMemberCache)
+                if (canAccessClass(memberCache._class, callingNS))
+                    for (Method method: memberCache.staticMethods.getOrDefault(methodName, Collections.emptyList()))
+                        if (canAccessMember(method, callingNS))
+                            methods.add(method);
+
+            return Reflect.findMostSpecificInvocable(argsTypes, methods, Executable::getParameterTypes, Executable::isVarArgs);
         }
 
-        /** Find the most specific member for the given parameter types.
-         * If there is only 1 member it will always be returned.
-         * @param list of possible members
-         * @param types of parameters
-         * @return the most specific member or null */
-        private Invocable findBest(List<Invocable> list, Class<?>[] types) {
-            if (list.isEmpty())
+        public Constructor<?> findConstructor(Class<?>[] argsTypes, NameSpace callingNS) {
+            if (!canAccessClass(this._class, callingNS))
                 return null;
-            if (list.size() == 1)
-                return list.get(0);
-            return Reflect.findMostSpecificInvocable(types, list);
+
+            List<Constructor<?>> constructors = new ArrayList<>();
+            for (Constructor<?> constructor: this.constructors)
+                if (canAccessMember(constructor, callingNS))
+                    constructors.add(constructor);
+
+            return Reflect.findMostSpecificInvocable(argsTypes, constructors, Executable::getParameterTypes, Executable::isVarArgs);
+            // List<Method> methods = new ArrayList<>();
+            
+            // for (MemberCache memberCache = this; memberCache != null; memberCache = memberCache.superClassMemberCache)
+            //     if (canAccessClass(memberCache._class, callingNS))
+            //         for (Method method: memberCache.methods.getOrDefault(methodName, Collections.emptyList()))
+            //             if (canAccessMember(thisArg, method, callingNS))
+            //                 methods.add(method);
+
+            // return Reflect.findMostSpecificExecutable(argsTypes, methods);
         }
 
-        /** Find invocable for the given name and arguments.
-         * Arguments are converted to type parameters.
-         * @param name of member
-         * @param args parameter argument values
-         * @return the most specific member or null */
-        public Invocable findMethod(String name, Object... args) {
-            return findMethod(name, Types.getTypes(args));
-        }
+        ////////////////////////////////////////////////////////////////////////////////
 
-        /** Find invocable for the given name and parameter types.
-         * @param name of member
-         * @param types of parameters
-         * @return the most specific member or null */
-        public Invocable findMethod(String name, Class<?>... types) {
-            if (!hasMember(name))
-                return null;
-            return findBest(members(name), types);
-        }
+        // /** Recursive processing of interfaces.
+        //  * Methods are stored by reference.
+        //  * @param interfaces for whom members are collected */
+        // private void processInterfaces(Class<?>[] interfaces) {
+        //     for (Class<?> intr : interfaces) {
+        //         if (isPackageAccessible(intr)) {
+        //             memberCache.init(intr);
+        //             for (Field f : intr.getDeclaredFields())
+        //                     cacheMember(Invocable.get(f));
+        //             for (Method m: intr.getDeclaredMethods())
+        //                 if (isPublic(m) || haveAccessibility())
+        //                     cacheMember(memberCache.get(intr)
+        //                     .findMethod(m.getName(), m.getParameterTypes()));
+        //         }
+        //         processInterfaces(intr.getInterfaces());
+        //     }
+        // }
 
-        /** Find static method for name. Used for static import.
-         * @param name of static member
-         * @return the most specific member or null */
-        public Invocable findStaticMethod(String name) {
-            if (!hasMember(name))
-                return null;
-            return members(name).stream()
-                .filter(Invocable::isStatic).findFirst().get();
-        }
+        // /** Cache a field member.
+        //  * @param member to cache
+        //  * @return true if this is a new member */
+        // private boolean cacheMember(FieldAccess member) {
+        //     if (!hasField(member.getName()))
+        //         return null == fields.put(member.getName(), member);
+        //     return false;
+        // }
 
-        /** Find property read method or getter for property name.
-         * No need for expensive method name conversion, member is
-         * cached by property name.
-         * @param name of property
-         * @return the property read method or null */
-        public Invocable findGetter(String propName) {
-            if (hasMember(propName))
-                for (Invocable property: members(propName))
-                    if (property.isGetter())
-                        return property;
-            return null;
-        }
+        // /** Cache constructors and methods.
+        //  * Identifies properties and caches an additional cache entry
+        //  * referenced by property name, as defined by bean specification.
+        //  * @param member to cache
+        //  * @return true if the cache changed */
+        // private boolean cacheMember(Invocable member) {
+        //     if (null == member) return false;
+        //     if (!member.isGetter() && !member.isSetter())
+        //         return cacheMember(member.getName(), member);
+        //     String name = member.getName();
+        //     String propName = name.replaceFirst("[gs]et|is", "");
+        //     if (propName.length() == 1 // double caps are skipped
+        //             || Character.isLowerCase(name.charAt(1))) {
+        //         char[] ch = propName.toCharArray();
+        //         ch[0] = Character.toLowerCase(ch[0]);
+        //         propName = new String(ch);
+        //     }
+        //     return cacheMember(name, member)
+        //         && cacheMember(propName, member);
+        // }
 
-        /** Find property write method or setter for property name.
-         * No need for expensive method name conversion, member is
-         * cached by property name.
-         * @param name of property
-         * @return the property write method or null */
-        public Invocable findSetter(String propName) {
-            if (hasMember(propName))
-                for (Invocable property: members(propName))
-                    if (property.isSetter())
-                        return property;
-            return null;
-        }
+        // /** Cache name associated with a list of members.
+        //  * @param name of member
+        //  * @param member invocable instance
+        //  * @return true if the cache changed */
+        // private boolean cacheMember(String name, Invocable member) {
+        //     if (!hasMember(name))
+        //         return null == cache.put(name,
+        //                 Collections.singletonList(member));
+        //     else if (memberCount(name) == 1)
+        //         cache.put(name, new ArrayList<>(members(name)));
+        //     return members(name).add(member);
+        // }
 
-        /** Find the index of the most appropriate member.
-         * Used for class constructor switch.
-         * @param name of member
-         * @param types of parameters
-         * @return index of the most specific member or -1 */
-        public int findMemberIndex(String name, Class<?>[] types) {
-           return Reflect.findMostSpecificInvocableIndex(types, members(name));
-        }
+        // /** Find the most specific member for the given parameter types.
+        //  * If there is only 1 member it will always be returned.
+        //  * @param list of possible members
+        //  * @param types of parameters
+        //  * @return the most specific member or null */
+        // private Invocable findBest(List<Invocable> list, Class<?>[] types) {
+        //     if (list.isEmpty())
+        //         return null;
+        //     if (list.size() == 1)
+        //         return list.get(0);
+        //     return Reflect.findMostSpecificInvocable(types, list);
+        // }
 
-        /** Retrieve list of member associated with name.
-         * @param name of member
-         * @return list of members or null */
-        public List<Invocable> members(String name) {
-            return cache.get(name);
-        }
+        // /** Find invocable for the given name and arguments.
+        //  * Arguments are converted to type parameters.
+        //  * @param name of member
+        //  * @param args parameter argument values
+        //  * @return the most specific member or null */
+        // public Invocable findMethod(String name, Object... args) {
+        //     return findMethod(name, Types.getTypes(args));
+        // }
 
-        /** Retrieve the number of members associated with name.
-         * @param name of member
-         * @return number of members */
-        public int memberCount(String name) {
-            return members(name).size();
-        }
+        // /** Find invocable for the given name and parameter types.
+        //  * @param name of member
+        //  * @param types of parameters
+        //  * @return the most specific member or null */
+        // public Invocable findMethod(String name, Class<?>... types) {
+        //     if (!hasMember(name))
+        //         return null;
+        //     return findBest(members(name), types);
+        // }
 
-        /** Does the member exist.
-         * @param name of member
-         * @return true if members exists */
-        public boolean hasMember(String name) {
-            return cache.containsKey(name);
-        }
+        // /** Find static method for name. Used for static import.
+        //  * @param name of static member
+        //  * @return the most specific member or null */
+        // public Invocable findStaticMethod(String name) {
+        //     if (!hasMember(name))
+        //         return null;
+        //     return members(name).stream()
+        //         .filter(Invocable::isStatic).findFirst().get();
+        // }
 
-        /** Does field exist.
-         * @param name of field
-         * @return true if field exists */
-        public boolean hasField(String name) {
-            return fields.containsKey(name);
-        }
+        // /** Find property read method or getter for property name.
+        //  * No need for expensive method name conversion, member is
+        //  * cached by property name.
+        //  * @param simpleName of property
+        //  * @return the property read method or null */
+        // public Invocable findGetter(String propName) {
+        //     if (hasMember(propName))
+        //         for (Invocable property: members(propName))
+        //             if (property.isGetter())
+        //                 return property;
+        //     return null;
+        // }
 
-        /** Find field associated to name.
-         * @param name of field
-         * @return the field invocable or null */
-        public Invocable findField(String name) {
-            if (!hasField(name))
-                return null;
-            return fields.get(name);
-        }
+        // /** Find property write method or setter for property name.
+        //  * No need for expensive method name conversion, member is
+        //  * cached by property name.
+        //  * @param simpleName of property
+        //  * @return the property write method or null */
+        // public Invocable findSetter(String propName) {
+        //     if (hasMember(propName))
+        //         for (Invocable property: members(propName))
+        //             if (property.isSetter())
+        //                 return property;
+        //     return null;
+        // }
+
+        // /** Find the index of the most appropriate member.
+        //  * Used for class constructor switch.
+        //  * @param name of member
+        //  * @param types of parameters
+        //  * @return index of the most specific member or -1 */
+        // public int findMemberIndex(String name, Class<?>[] types) {
+        //    return Reflect.findMostSpecificInvocableIndex(types, members(name));
+        // }
+
+        // /** Retrieve list of member associated with name.
+        //  * @param name of member
+        //  * @return list of members or null */
+        // public List<Invocable> members(String name) {
+        //     return cache.get(name);
+        // }
+
+        // /** Retrieve the number of members associated with name.
+        //  * @param name of member
+        //  * @return number of members */
+        // public int memberCount(String name) {
+        //     return members(name).size();
+        // }
+
+        // /** Does the member exist.
+        //  * @param name of member
+        //  * @return true if members exists */
+        // public boolean hasMember(String name) {
+        //     return cache.containsKey(name);
+        // }
+
+        // /** Does field exist.
+        //  * @param name of field
+        //  * @return true if field exists */
+        // public boolean hasField(String name) {
+        //     return fields.containsKey(name);
+        // }
+
+        // /** Find field associated to name.
+        //  * @param name of field
+        //  * @return the field invocable or null */
+        // public Invocable findField(String name) {
+        //     if (!hasField(name))
+        //         return null;
+        //     return fields.get(name);
+        // }
     }
 
     /**
@@ -535,12 +702,12 @@ public class BshClassManager {
         However BeanShell is not currently able to reload
         classes supplied through the external classloader.
     */
-    public void setClassLoader( ClassLoader externalCL ) {
+    public void setClassLoader(ClassLoader externalCL) {
         externalClassLoader = externalCL;
         classLoaderChanged();
     }
 
-    public void addClassPath( URL path ) throws IOException { }
+    public void addClassPath(URL path) throws IOException { }
 
     /**
         Clear all loaders and start over.  No class loading.
@@ -553,7 +720,7 @@ public class BshClassManager {
         Set a new base classpath and create a new base classloader.
         This means all types change.
     */
-    public void setClassPath( URL [] cp ) throws UtilEvalError {
+    public void setClassPath(URL[] cp) throws UtilEvalError {
         throw cmUnavailable();
     }
 
@@ -572,7 +739,7 @@ public class BshClassManager {
         whenever we are asked for classes in the appropriate space.
         For this we use a DiscreteFilesClassLoader
     */
-    public void reloadClasses( String [] classNames ) throws UtilEvalError {
+    public void reloadClasses(String[] classNames) throws UtilEvalError {
         throw cmUnavailable();
     }
 
@@ -582,7 +749,7 @@ public class BshClassManager {
         The special package name "<unpackaged>" can be used to refer
         to unpackaged classes.
     */
-    public void reloadPackage( String pack ) throws UtilEvalError {
+    public void reloadPackage(String pack) throws UtilEvalError {
         throw cmUnavailable();
     }
 
@@ -605,8 +772,7 @@ public class BshClassManager {
         Return the name or null if none is found,
         Throw an ClassPathException containing detail if name is ambigous.
     */
-    protected String getClassNameByUnqName( String name )
-            throws UtilEvalError {
+    protected String getClassNameByUnqName(String name) throws UtilEvalError {
         throw cmUnavailable();
     }
 
@@ -623,15 +789,13 @@ public class BshClassManager {
         reloading of the generated classes.
     */
     public Class<?> defineClass( String name, byte [] code ) {
-        throw new InterpreterError("Can't create class ("+name
-            +") without class manager package.");
+        throw new InterpreterError("Can't create class ("+name+") without class manager package.");
     }
 
     protected void classLoaderChanged() { }
 
     protected static UtilEvalError cmUnavailable() {
-        return new Capabilities.Unavailable(
-            "ClassLoading features unavailable.");
+        return new Capabilities.Unavailable("ClassLoading features unavailable.");
     }
 
     public static interface Listener {

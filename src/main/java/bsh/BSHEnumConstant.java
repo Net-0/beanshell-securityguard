@@ -15,24 +15,30 @@
  * limitations under the License. */
 package bsh;
 
-public class BSHEnumConstant extends SimpleNode {
+import bsh.internals.BshField;
+import bsh.internals.BshModifier;
+import bsh.internals.type.BshLazyType;
+
+class BSHEnumConstant extends SimpleNode {
     private static final long serialVersionUID = 1L;
     Modifiers mods = new Modifiers(Modifiers.FIELD);
-    {
+    { // TODO: bloco de código n estático ??? As classes geradas dão suporte à isso ???
         mods.setConstant();
         mods.addModifier("enum");
     }
     String name;
 
-    public BSHEnumConstant(int id) { super(id); }
+    BSHEnumConstant(int id) { super(id); }
 
-    public Object eval( CallStack callstack, Interpreter interpreter ) throws EvalError {
-        NameSpace namespace = callstack.top();
-        if ( !getName().equals(""+namespace.classInstance) )
-            return Primitive.VOID;
+    public Object eval(CallStack callstack, Interpreter interpreter) throws EvalError {
+        // NameSpace nameSpace = callstack.top();
+        // TODO: verificar isso!
+        // if ( !getName().equals(""+nameSpace.classInstance) )
+        //     return Primitive.VOID;
 
-        if (hasArguments(callstack, interpreter))
-            This.CONTEXT_ARGS.get().put( namespace.classInstance.toString(), getArguments(callstack, interpreter) );
+        // TODO: verificar isso!
+        // if (hasArguments(callstack, interpreter))
+        //     This.CONTEXT_ARGS.get().put( nameSpace.classInstance.toString(), getArguments(callstack, interpreter) );
 
         for ( int i = 0; i < jjtGetNumChildren(); i++ )
             if ( jjtGetChild(i) instanceof BSHBlock )
@@ -41,29 +47,69 @@ public class BSHEnumConstant extends SimpleNode {
         return Primitive.VOID;
     }
 
-    public boolean hasArguments(CallStack callstack, Interpreter interpreter) throws EvalError {
-        return null != getArguments(callstack, interpreter);
-    }
+    // public boolean hasArguments(CallStack callstack, Interpreter interpreter) throws EvalError {
+    //     return null != getArguments(callstack, interpreter);
+    // }
 
-    Object[] args;
-    public Object[] getArguments(CallStack callstack, Interpreter interpreter) throws EvalError {
-        if (args == null && jjtGetNumChildren() > 0 && jjtGetChild(0) instanceof BSHArguments) {
-            BSHArguments arg = (BSHArguments)jjtGetChild(0);
-            args = arg.getArguments(callstack, interpreter);
+    // TODO: validação para com o construtor quando não houver argumentos suficiente para chama-lo!
+    private Object[] getArguments(CallStack callstack, Interpreter interpreter) throws EvalError {
+        if (this.jjtGetNumChildren() > 0 && jjtGetChild(0) instanceof BSHArguments) {
+            BSHArguments arg = this.jjtGetChild(0);
+            return arg.getArguments(callstack, interpreter);
         }
-        return args;
+        return new Object[0];
     }
 
     public Class<?> getType() {
         return Enum.class;
     }
 
-    public String getName( ) {
+    public String getName() {
         return name;
     }
 
     public String toString() {
         return super.toString() + ": " + mods + " " + getType() + " " + name;
     }
+
+    // private static final int mod = BshModifier.PUBLIC + BshModifier.STATIC + BshModifier.FINAL + BshModifier.ENUM;
+    // private static final int mod = Opcodes.ACC_PUBLIC + Opcodes.ACC_STATIC + Opcodes.ACC_FINAL + Opcodes.ACC_ENUM;
+
+    protected final BshField toField(final String enumName, CallStack callStack, Interpreter interpreter) {
+        final BshLazyType type = new BshLazyType(enumName, 0, null); // TODO: ver o futureClass!
+        return new BshField(BshModifier.ENUM_CONSTANT_MODIFIERS, type, enumName);
+    }
+
+    // TODO: as enums estavam funcionando 100% ? fazer testes completos com a versão anterior dps!
+    // TODO: terminar de implementar
+    protected final void initConstant(CallStack callStack, Interpreter interpreter) throws EvalError {
+        final NameSpace nameSpace = callStack.top();
+        final Class<?> _class = nameSpace.declaringClass.toClass();
+        final Object[] args = this.getArguments(callStack, interpreter);
+
+        try {
+            final Object obj = Reflect.construct(_class, args, callStack);
+            Reflect.setStaticField(_class, this.name, obj, callStack);
+        } catch (UtilEvalError e) {
+            throw e.toEvalError(this, callStack);
+        } catch (NoSuchMethodException e) {
+            throw new EvalError(e.getMessage(), this, callStack);
+        } catch (NoSuchFieldException e) {
+            throw new EvalError(e.getMessage(), this, callStack);
+        }
+
+        // final BSHType typeNode = getTypeNode();
+        // for (final BSHVariableDeclarator varNode: this.getDeclarators()) {
+        //     final Object value = varNode.eval(typeNode, this.modifiers, callStack, interpreter);
+        //     try {
+        //         Reflect.setStaticField(_class, varNode.name, value, callStack);
+        //     } catch (UtilEvalError e) {
+        //         throw e.toEvalError(this, callStack);
+        //     } catch (NoSuchFieldException e) {
+        //         throw new EvalError(e.getMessage(), this, callStack);
+        //     }
+        // }
+    }
+
 }
-/* JavaCC - OriginalChecksum=6bf5bca59c6d351657103c4ff0e8d054 (do not edit this line) */
+
