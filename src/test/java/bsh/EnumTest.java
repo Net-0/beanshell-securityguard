@@ -14,11 +14,28 @@ import static org.hamcrest.Matchers.arrayWithSize;
 import static org.hamcrest.Matchers.arrayContaining;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Arrays;
+import java.util.Map;
+
 import org.junit.Rule;
 
-
+// TODO: fazer testes unitários testando as constantes da enum!
+// TODO: fazer testes unitários testando as constantes da enum com construtor customizado ?
 @RunWith(FilteredTestRunner.class)
 public class EnumTest {
+
+    public static interface MyInterface {
+
+    }
+
+    public static enum MyEnum1 {
+        A, B, C, D, E, F, G;
+    }
+
+    public static enum MyEnum2 implements MyInterface {
+
+    }
+
     @Rule
     public ExpectedException thrown = ExpectedException.none();
 
@@ -81,11 +98,17 @@ public class EnumTest {
 
     @Test
     public void enum_values_zero() throws Exception {
-        Object[] obj = (Object[]) eval(
-            "enum E0 { }",
-            "E0.values();"
-        );
-        assertThat("array with length length is 0", obj, arrayWithSize(0));
+        // System.out.println("Object.class.getCanonicalName(): " + Object.class.getCanonicalName());
+        try {
+            Object[] obj = (Object[]) eval(
+                "enum E0 { }",
+                "E0.values();"
+            );
+            assertThat("array with length length is 0", obj, arrayWithSize(0));
+        } catch (Throwable t) {
+            t.printStackTrace();
+            throw t;
+        }
     }
 
     @Test
@@ -106,11 +129,34 @@ public class EnumTest {
 
     @Test
     public void enum_values_excludes_enum_field() throws Exception {
+        try {
+            final Interpreter bsh = new Interpreter();
+            Object[] obj = (Object[]) bsh.eval(script(
+                "enum E4 {",
+                    "VAL1, VAL2, VAL3, VAL4;",
+                    "E4 enm;",
+                "}",
+                "E4.values();"
+            ));
+            assertThat("array with length length is 4", obj, arrayWithSize(4));
+            assertThat("array containing VAL1, VAL2, VAL3, VAL4", obj, arrayContaining(
+                    bsh.eval("E4.VAL1"), bsh.eval("E4.VAL2"),
+                    bsh.eval("E4.VAL3"), bsh.eval("E4.VAL4")));
+            bsh.getNameSpace().clear();
+        } catch (Throwable t) {
+            t.printStackTrace();
+            t.getCause().printStackTrace();
+            throw t;
+        }
+    }
+
+    @Test
+    public void enum_values_excludes_enum_static_field() throws Exception {
         final Interpreter bsh = new Interpreter();
         Object[] obj = (Object[]) bsh.eval(script(
             "enum E4 {",
                 "VAL1, VAL2, VAL3, VAL4;",
-                "E4 enm;",
+                "static E4 enm = E4.VAL1;",
             "}",
             "E4.values();"
         ));
@@ -122,12 +168,12 @@ public class EnumTest {
     }
 
     @Test
-    public void enum_values_excludes_enum_static_field() throws Exception {
+    public void enum_values_excludes_enum_static_public_field() throws Exception {
         final Interpreter bsh = new Interpreter();
         Object[] obj = (Object[]) bsh.eval(script(
             "enum E4 {",
                 "VAL1, VAL2, VAL3, VAL4;",
-                "static E4 enm = E4.VAL1;",
+                "public static final E4 enm = E4.VAL1;",
             "}",
             "E4.values();"
         ));
@@ -180,15 +226,25 @@ public class EnumTest {
 
     @Test
     public void enum_assign() throws Exception {
-        Object obj = eval(
-            "enum E6 {",
-                "VAL1, VAL2, VAL3, VAL4",
-            "}",
-            "val3 = E6.VAL3;",
-            "val3;"
-        );
-        assertThat("VAL3 instance of Enum", obj, instanceOf(Enum.class));
-        assertThat("VAL3 string value", obj.toString(), equalTo("VAL3"));
+        try {
+            // Class<?>[] types = { String.class, int.class };
+            // Class<?>[] _types = Arrays.copyOfRange(types, 2, types.length);
+            // System.out.println("_types: " + Arrays.asList(_types));
+            Object obj = eval(
+                "enum E6 {",
+                    "VAL1, VAL2, VAL3, VAL4",
+                "}",
+                "val3 = E6.VAL3;",
+                "val3;"
+            );
+            assertThat("VAL3 instance of Enum", obj, instanceOf(Enum.class));
+            assertThat("VAL3 string value", obj.toString(), equalTo("VAL3"));
+        } catch (Throwable t) {
+            t.printStackTrace();
+            // System.out.println("--------------------------------------------");
+            // if (t.getCause() != null) t.getCause().printStackTrace();
+            throw t;
+        }
     }
 
     @Test
@@ -243,33 +299,40 @@ public class EnumTest {
 
     @Test
     public void enum_switch() throws Exception {
-        final Interpreter bsh = new Interpreter();
-        bsh.eval(script(
-            "enum Name { VAL1, VAL2 }",
-            "switchit(val) {",
-                "switch (val) {",
-                    "case VAL1:",
-                        "return 'val1';",
-                        "break;",
-                    "case VAL2:",
-                        "return 'val2';",
-                        "break;",
-                    "default:",
-                        "return 'default';",
-                "}",
-            "}"
-        ));
-        assertThat("val2 switched", bsh.eval("switchit(Name.VAL2);"), equalTo("val2"));
-        assertThat("val1 switched", bsh.eval("switchit(Name.VAL1);"), equalTo("val1"));
-        assertThat("default switched null", bsh.eval("switchit(null);"), equalTo("default"));
-        assertThat("default switched string", bsh.eval("switchit('VAL1');"), equalTo("default"));
-        bsh.getNameSpace().clear();
+        try {
+            final Interpreter bsh = new Interpreter();
+            bsh.eval(script(
+                "enum Name { VAL1, VAL2 }",
+                "switchit(val) {",
+                    "switch (val) {",
+                        "case VAL1:",
+                            "return 'val1';",
+                            "break;",
+                        "case VAL2:",
+                            "return 'val2';",
+                            "break;",
+                        "default:",
+                            "return 'default';",
+                    "}",
+                "}"
+            ));
+            assertThat("val2 switched", bsh.eval("switchit(Name.VAL2);"), equalTo("val2"));
+            assertThat("val1 switched", bsh.eval("switchit(Name.VAL1);"), equalTo("val1"));
+            assertThat("default switched null", bsh.eval("switchit(null);"), equalTo("default"));
+            assertThat("default switched string", bsh.eval("switchit('VAL1');"), equalTo("default"));
+            bsh.getNameSpace().clear();
+        } catch (Throwable t) {
+            t.printStackTrace();
+            t.getCause().printStackTrace();
+            throw t;
+        }
     }
 
     @Test
     public void enum_args_constructor_required() throws Exception {
         thrown.expect(EvalError.class);
-        thrown.expectMessage(containsString("Can't find constructor: Name(int)"));
+        // thrown.expectMessage(containsString("Can't find constructor: Name(int)"));
+        thrown.expectMessage(containsString("No such constructor: Name(int)"));
 
         eval(
             "enum Name {",
@@ -283,7 +346,8 @@ public class EnumTest {
     @Test
     public void enum_new_enum_default_constructor() throws Exception {
         thrown.expect(EvalError.class);
-        thrown.expectMessage(containsString("Can't find default constructor for: class Name"));
+        // thrown.expectMessage(containsString("Can't find default constructor for: class Name"));
+        thrown.expectMessage(containsString("No such constructor: Name()"));
 
         eval(
             "enum Name {",
@@ -296,8 +360,8 @@ public class EnumTest {
     @Test
     public void enum_new_enum_default_enum_constructor() throws Exception {
         thrown.expect(EvalError.class);
-        thrown.expectMessage(
-                containsString("Can't find constructor: Name(String)"));
+        // thrown.expectMessage(containsString("Can't find constructor: Name(String)"));
+        thrown.expectMessage(containsString("No such constructor: Name(java.lang.String)"));
 
         eval(
             "enum Name {",
@@ -311,17 +375,23 @@ public class EnumTest {
 
     @Test
     public void enum_args_constructor() throws Exception {
-        Object obj = eval(
-            "enum Name {",
-                "VAL1(1), VAL2(2);",
-                "int val;",
-                "private Name(int a) {",
-                    "val = a;",
+        try {
+            Object obj = eval(
+                "enum Name {",
+                    "VAL1(1), VAL2(2);",
+                    "int val;",
+                    "private Name(int a) {",
+                        "val = a;",
+                    "}",
                 "}",
-            "}",
-            "Name.VAL1.val;"
-        );
-        assertThat("enum args constructor set value", obj, equalTo(1));
+                "Name.VAL1.val;"
+            );
+            assertThat("enum args constructor set value", obj, equalTo(1));
+        } catch (Throwable t) {
+            t.printStackTrace();
+            // t.getCause().getCause().printStackTrace();
+            throw t;
+        }
     }
 
     @Test
@@ -379,16 +449,21 @@ public class EnumTest {
 
     @Test
     public void enum_implements_interface_static_method() throws Exception {
-        Object obj = eval(
-            "interface AA {",
-                "static int def(a) { a; }",
-            "}",
-            "enum Name implements AA {",
-                "VAL1, VAL2;",
-            "}",
-            "Name.def(44);"
-        );
-        assertThat("interface inherited static method", obj, equalTo(44));
+        try {
+            Object obj = eval(
+                "interface AA {",
+                    "static Object def(a) { a; }",
+                "}",
+                "enum Name implements AA {",
+                    "VAL1, VAL2;",
+                "}",
+                "Name.def(44);"
+            );
+            assertThat("interface inherited static method", obj, equalTo(44));
+        } catch (Throwable t) {
+            t.printStackTrace();
+            throw t;
+        }
     }
 
     @Test
@@ -448,25 +523,60 @@ public class EnumTest {
 
     @Test
     public void enum_block_method_and_constructor() throws Exception {
-        final Interpreter bsh = new Interpreter();
-        bsh.eval(script(
-            "enum Name {",
-                "VAL1('1val') {",
-                    "get() { str + '1'; }",
-                "},",
-                "VAL2('2val') {",
-                    "get() { str + '2'; }",
-                "};",
-                "String str = '';",
-                "Name(String s) {",
-                    "str = s;",
-                "}",
-            "}"
-        ));
-        assertThat("enum block variable VAL2", bsh.eval("Name.VAL2.get()"), equalTo("2val2"));
-        assertThat("enum block variable VAL1", bsh.eval("Name.VAL1.get()"), equalTo("1val1"));
-        bsh.getNameSpace().clear();
+        try {
+            final Interpreter bsh = new Interpreter();
+            bsh.eval(script(
+                "enum Name {",
+                    "VAL1('1val') {",
+                        "get() { str + '1'; }",
+                    "},",
+                    "VAL2('2val') {",
+                        "get() { str + '2'; }",
+                    "};",
+                    "String str = '';",
+                    "Name(String s) {",
+                        "str = s;",
+                    "}",
+                "}"
+            ));
+            assertThat("enum block variable VAL2", bsh.eval("Name.VAL2.get()"), equalTo("2val2"));
+            assertThat("enum block variable VAL1", bsh.eval("Name.VAL1.get()"), equalTo("1val1"));
+            bsh.getNameSpace().clear();
+        } catch (Throwable t) {
+            t.printStackTrace();
+            System.out.println("----------------------------");
+            if (t.getCause() != null) t.getCause().printStackTrace();
+            throw t;
+        }
     }
+
+
+    // @Test
+    // public void test() throws Throwable {
+    //     // interface ABC {
+    //     //     static int dd() {
+    //     //         return 123;
+    //     //     }
+    //     // }
+
+    //     Class<?> _class = (Class<?>) TestUtil.eval(
+    //         "interface ABC {",
+    //         "    static int dd() {",
+    //         "        return 123;",
+    //         "    }",
+    //         "}",
+    //         "return ABC.class;"
+    //     );
+    //     // Class<?> _class = ABC.class;
+
+    //     System.out.println("_class.getDeclaredMethods(): " + Arrays.asList(_class.getDeclaredMethods()));
+    // }
 
 }
 
+// interface ABC {
+//     protected static int dd() {
+//         return 123;
+//     }
+//     public int aa();
+// }

@@ -26,6 +26,8 @@
 package bsh;
 
 import java.io.Serializable;
+import java.util.Arrays;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 /*
@@ -156,16 +158,20 @@ class SimpleNode implements Node, Serializable {
     }
 
     /** {@inheritDoc} */
-    @Override
-    public Node jjtGetChild(int i) { return children[i]; }
+    @Override // TODO: ver usos do jjtGetChild() q utilizavam cast para não usarem mais!
+    @SuppressWarnings("unchecked")
+    public <N extends Node> N jjtGetChild(int i) {
+        return (N) children[i];
+    }
 
     /** {@inheritDoc} */
-    @Override
+    @Override // TODO: ver usos do jjtGetChildren() q utilizavam cast para não usarem mais!
     public Node[] jjtGetChildren() {
         if ( null == children )
             children = new Node[0];
         return children;
     }
+
     /** {@inheritDoc} */
     @Override
     public int jjtGetNumChildren() {

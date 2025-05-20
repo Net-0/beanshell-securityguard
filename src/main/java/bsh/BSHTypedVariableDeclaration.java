@@ -27,6 +27,11 @@
 
 package bsh;
 
+import java.lang.reflect.Type;
+
+import bsh.internals.BshClass;
+import bsh.internals.BshField;
+
 class BSHTypedVariableDeclaration extends SimpleNode {
     private static final long serialVersionUID = 1L;
     public Modifiers modifiers = new Modifiers(Modifiers.FIELD);
@@ -34,92 +39,154 @@ class BSHTypedVariableDeclaration extends SimpleNode {
 
     BSHTypedVariableDeclaration(int id) { super(id); }
 
-    private BSHType getTypeNode() {
+    protected BSHType getTypeNode() {
         return ((BSHType)jjtGetChild(0));
     }
 
-    Class<?> evalType( CallStack callstack, Interpreter interpreter )
-        throws EvalError
-    {
-        BSHType typeNode = getTypeNode();
-        return typeNode.getType( callstack, interpreter );
+    Class<?> evalType(CallStack callstack, Interpreter interpreter) throws EvalError {
+        return this.getTypeNode()._toType(callstack, interpreter);
+        // BSHType typeNode = getTypeNode();
+        // return typeNode.getType( callstack, interpreter );
     }
 
-    BSHVariableDeclarator [] getDeclarators()
-    {
-        if (null != bvda)
-            return bvda;
+    BSHVariableDeclarator[] getDeclarators() {
+        if (null != bvda) return bvda;
         int n = jjtGetNumChildren();
         int start=1;
-        bvda = new BSHVariableDeclarator[ n-start ];
+        bvda = new BSHVariableDeclarator[n-start];
         for (int i = start; i < n; i++)
-        {
             bvda[i-start] = (BSHVariableDeclarator)jjtGetChild(i);
-        }
         return bvda;
     }
 
-    /**
-        evaluate the type and one or more variable declarations, e.g.:
-            int a, b=5, c;
-    */
-    public Object eval( CallStack callstack, Interpreter interpreter)
-        throws EvalError
-    {
+    /** evaluate the type and one or more variable declarations, e.g.: int a, b=5, c; */
+    public Object eval(CallStack callStack, Interpreter interpreter) throws EvalError {
         Object value = Primitive.VOID;
         try {
-            NameSpace namespace = callstack.top();
-            BSHType typeNode = getTypeNode();
-            Class<?> type = typeNode.getType( callstack, interpreter );
+            final NameSpace nameSpace = callStack.top();
+            final BSHType typeNode = getTypeNode();
+            final Type type = typeNode._toType(callStack, interpreter);
 
-            BSHVariableDeclarator [] bvda = getDeclarators();
-            for (int i = 0; i < bvda.length; i++)
-            {
-                BSHVariableDeclarator dec = bvda[i];
+            // BSHVariableDeclarator[] bvda = getDeclarators();
+            // for (int i = 0; i < bvda.length; i++) {
+                // BSHVariableDeclarator dec = bvda[i];
+            for (final BSHVariableDeclarator dec: this.getDeclarators()) {
 
                 // Type node is passed down the chain for array initializers
                 // which need it under some circumstances
-                value = dec.eval( typeNode, modifiers, callstack, interpreter);
+                value = dec.eval(typeNode, modifiers, callStack, interpreter);
                 try {
-                    LHS lhs = null;
-                    if ( namespace.isClass )
-                        if ( null != namespace.classInstance )
-                            lhs = new LHS(namespace.classInstance,
-                                Reflect.resolveJavaField(
-                                    namespace.classStatic,
-                                dec.name, modifiers.hasModifier("static")));
-                        else
-                            lhs = new LHS(namespace.classStatic,
-                                Reflect.resolveJavaField(namespace.classStatic,
-                                dec.name, modifiers.hasModifier("static")));
+                    // TODO: see it!
+                    // LHS lhs = null;
+                    // if ( namespace.isClass )
+                    //     if ( null != namespace.classInstance )
+                    //         lhs = new LHS(
+                    //             namespace.classInstance,
+                    //             Reflect.resolveJavaField(namespace.classStatic, dec.name, modifiers.hasModifier("static"))
+                    //         );
+                    //     else
+                    //         lhs = new LHS(
+                    //             namespace.classStatic,
+                    //             Reflect.resolveJavaField(namespace.classStatic, dec.name, modifiers.hasModifier("static"))
+                    //         );
 
-                    if ( null != lhs && null != lhs.field ) {
-                        Variable var = new Variable(dec.name, type, lhs);
-                        var.modifiers = modifiers;
-                        var.setValue(value, Variable.ASSIGNMENT);
-                        namespace.setVariableImpl(var);
-                    } else {
-                        if (interpreter.getStrictJava()
-                                && value instanceof Primitive
-                                && ((Primitive) value).isNumber())
-                            value = Primitive.castNumberStrictJava(type,
-                                    ((Primitive) value).numberValue());
-                        namespace.setTypedVariable(
-                                dec.name, type, value, modifiers );
-                        if (!namespace.isMethod)
-                            interpreter.getClassManager().addListener(
-                                namespace.getVariableImpl(dec.name, false));
-                    }
-                    if (!namespace.isClass)
-                        value = namespace.getVariable(dec.name);
-                } catch ( UtilEvalError e ) {
-                    throw e.toEvalError( this, callstack );
+                    // TODO: see it!
+                    // if ( null != lhs && null != lhs.field ) {
+                    //     Variable var = new Variable(dec.name, type, lhs);
+                    //     var.modifiers = modifiers;
+                    //     var.setValue(value, Variable.ASSIGNMENT);
+                    //     namespace.setVariableImpl(var);
+                    // } else {
+                        // if (interpreter.getStrictJava() && value instanceof Primitive && ((Primitive) value).isNumber())
+                        //     value = Primitive.castNumberStrictJava(type, ((Primitive) value).numberValue());
+                        // namespace.setTypedVariable(dec.name, type, value, modifiers);
+                        // if (!namespace.isMethod) // TODO: see it later!
+                        //     interpreter.getClassManager().addListener(namespace.getVariableImpl(dec.name, false));
+                    // }
+                    // if (!namespace.isClass) // TODO: see it later?
+                        // value = namespace.getVariable(dec.name);
+
+                    // TODO: isso seria strictJava ?
+                    // TODO: ver uma mensagem de erro!
+                    if (nameSpace.hasLocalVariable(dec.name))
+                        throw new EvalError("", this, callStack);
+
+                    // System.out.println(")))))))))))))))))))))");
+                    // System.out.println("BSHTypedVariableDeclaration.eval(): ");
+                    // System.out.println(" - nameSpace: " + nameSpace);
+                    // System.out.println(" - dec.name: " + dec.name);
+                    // System.out.println(" - value: " + value);
+                    // System.out.println(")))))))))))))))))))))");
+                    // TODO: e a questão do 'type' ? Como fica para variáveis q possuem os 2 tipos de assinatura de array ?
+                    value = nameSpace.setLocalVariable(dec.name, type, value, this.modifiers);
+                } catch (UtilEvalError e) {
+                    throw e.toEvalError(this, callStack);
                 }
             }
-        } catch ( EvalError e ) {
+        } catch (EvalError e) {
             throw e.reThrow( "Typed variable declaration" );
         }
         return value;
+    }
+
+    protected BshField[] toFields(CallStack callstack, Interpreter interpreter) throws EvalError {
+        BSHVariableDeclarator[] variables = this.getDeclarators();
+        BshField[] fields = new BshField[variables.length];
+        BSHType typeNode = this.getTypeNode();
+        for (int i = 0; i < variables.length; i++)
+            fields[i] = variables[i].toField(typeNode, modifiers, callstack, interpreter);
+        return fields;
+    }
+
+    protected void initStaticFields(BshClass bshClass, CallStack callStack, Interpreter interpreter) throws EvalError {
+        // final NameSpace nameSpace = callStack.top();
+        // System.out.println("BSHTypedVariableDeclaration.initStaticFields(): ");
+        // System.out.println(" - nameSpace: " + nameSpace.getName());
+        // final Class<?> _class = nameSpace.declaringClass.toClass();
+        final Class<?> _class = bshClass.toClass();
+        final BSHType typeNode = this.getTypeNode();
+        // final NameSpace classNameSpace = new NameSpace(callStack.top(), _class.getName(), _class);
+        final NameSpace classNameSpace = new NameSpace(callStack.top(), bshClass.name, _class);
+        callStack.push(classNameSpace);
+
+        for (final BSHVariableDeclarator varNode: this.getDeclarators()) {
+            // TODO: testar esse skip!
+            if (varNode.jjtGetNumChildren() == 0) continue;
+
+            // TODO: testar multi-field com e sem initializers para static e non-static
+            final Object value = varNode.eval(typeNode, this.modifiers, callStack, interpreter);
+            try {
+                Reflect.setStaticField(_class, varNode.name, value, callStack);
+            } catch (UtilEvalError e) {
+                throw e.toEvalError(this, callStack);
+            } catch (NoSuchFieldException e) {
+                throw new EvalError(e.getMessage(), this, callStack);
+            }
+        }
+
+        callStack.pop();
+    }
+
+    // TODO: faz sentido chamar o initStaticFields() e initFields() se não houver nenhum field com initializer ?
+    protected <T> void initFields(BshClass bshClass, T thisArg, CallStack callStack, Interpreter interpreter) throws EvalError {
+        final BSHType typeNode = getTypeNode();
+        // bshClass.getThisFromObject(thisArg);
+        // final This _this = BshClass.fromGeneratedClass(_class).getThisFromObject(thisArg);
+        // final This _this = callStack.top().getThis();
+        // final This _this = callStack.top()._this; // TODO: testar isso ?
+        final This _this = bshClass.getThisFromObject(thisArg);
+
+        for (final BSHVariableDeclarator varNode: this.getDeclarators()) {
+            if (!varNode.hasInitializer()) continue;
+            final Object value = varNode.eval(typeNode, this.modifiers, callStack, interpreter);
+            try {
+                Reflect.setField(_this, varNode.name, value, callStack, interpreter.getStrictJava());
+            } catch (UtilEvalError e) {
+                throw e.toEvalError(this, callStack);
+            } catch (NoSuchFieldException e) {
+                throw new EvalError(e.getMessage(), this, callStack);
+            }
+        }
     }
 
     public String toString() {

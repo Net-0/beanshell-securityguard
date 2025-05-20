@@ -17,6 +17,9 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 
+import bsh.internals.BshModifier;
+
+// TODO: não faz mais sentido guardarmos os modifiers em uma String[] e onde se strictJava=true, ele lança erro para modificadores inválidos ?
 /** Bsh equivalent and compatible, for the most part, with JAVA's Modifiers.
  * The JAVA Modifier class does not include default as a modifier for methods
  * and although it does define enum as a modifier, albeit not accessible, it
@@ -27,23 +30,24 @@ public class Modifiers implements java.io.Serializable {
     public static final int CLASS=0, INTERFACE=1, METHOD=2, FIELD=3, PARAMETER=4, CONSTRUCTOR=5;
     public static final Map<String, Integer> CONST = new HashMap<>(17);
     static {
-        CONST.put("public", Modifier.PUBLIC);
-        CONST.put("private", Modifier.PRIVATE);
-        CONST.put("protected", Modifier.PROTECTED);
-        CONST.put("static", Modifier.STATIC);
-        CONST.put("final", Modifier.FINAL);
-        CONST.put("synchronized", Modifier.SYNCHRONIZED);
-        CONST.put("volatile", Modifier.VOLATILE);
-        CONST.put("transient", Modifier.TRANSIENT);
-        CONST.put("native", Modifier.NATIVE);
-        CONST.put("interface", Modifier.INTERFACE);
-        CONST.put("abstract", Modifier.ABSTRACT);
-        CONST.put("strict", Modifier.STRICT);
-        CONST.put("synthetic", 4096);
-        CONST.put("annotation", 8192);
-        CONST.put("enum", 16384);  // not visible from Modifier
-        CONST.put("mandated", 32768);
-        CONST.put("default", 65536); // not included in Modifier
+        CONST.put("public", BshModifier.PUBLIC);
+        CONST.put("private", BshModifier.PRIVATE);
+        CONST.put("protected", BshModifier.PROTECTED);
+        CONST.put("static", BshModifier.STATIC);
+        CONST.put("final", BshModifier.FINAL);
+        CONST.put("synchronized", BshModifier.SYNCHRONIZED);
+        CONST.put("volatile", BshModifier.VOLATILE);
+        CONST.put("transient", BshModifier.TRANSIENT);
+        CONST.put("native", BshModifier.NATIVE);
+        CONST.put("interface", BshModifier.INTERFACE); // TODO: ver esse modifier para classes geradas
+        CONST.put("abstract", BshModifier.ABSTRACT);
+        CONST.put("strict", BshModifier.STRICT);
+        CONST.put("synthetic", BshModifier.SYNTHETIC);
+        CONST.put("annotation", BshModifier.ANNOTATION);
+        // TODO: ver esse modifier para classes geradas
+        CONST.put("enum", BshModifier.ENUM);  // not visible from Modifier
+        CONST.put("mandated", BshModifier.MANDATED);
+        CONST.put("default", 65536); // not included in Modifier // TODO: remover isso
     }
     private static final int ACCESS_MODIFIERS = 7;
     private String type;
@@ -53,6 +57,11 @@ public class Modifiers implements java.io.Serializable {
      * @param context identifier for the application of modifiers */
     public Modifiers(int context) {
         appliedContext(context);
+    }
+
+    protected Modifiers(int context, int modifiers) {
+        appliedContext(context);
+        this.modifiers = this.valid & modifiers;
     }
 
     /** Add a modifier by modifier name. Will do a constant lookup to retrieve
@@ -132,6 +141,7 @@ public class Modifiers implements java.io.Serializable {
 
     /** Convenience method to assign modifiers for a constant definition. */
     public void setConstant() {
+        // Modifier.
         modifiers = Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL;
     }
 
@@ -199,8 +209,35 @@ public class Modifiers implements java.io.Serializable {
     /** {@inheritDoc} */
     @Override
     public String toString() {
+        // TODO: rever isso aqui
+        // NOTE: para um BshModifier.toString(), lembre-se q há + de 1 mod com o msm número!
         return "Modifiers: " + Modifier.toString(modifiers) + (
             (modifiers & CONST.get("enum")) != 0 ? " enum" :
             (modifiers & CONST.get("default")) != 0 ? " default" : "");
+    }
+
+    // TODO: verificar isso
+    public static int fromKeyword(final String kw) {
+        switch (kw) {
+            case "public": return BshModifier.PUBLIC;
+            case "private": return BshModifier.PRIVATE;
+            case "protected": return BshModifier.PROTECTED;
+            case "static": return BshModifier.STATIC;
+            case "final": return BshModifier.FINAL;
+            case "synchronized": return BshModifier.SYNCHRONIZED;
+            case "volatile": return BshModifier.VOLATILE;
+            // case "BRIDGE": return BshModifier.BRIDGE;
+            case "transient": return BshModifier.TRANSIENT;
+            // case "VARARGS": return BshModifier.VARARGS;
+            case "native": return BshModifier.NATIVE; // TODO: oq fazer com isso ??
+            case "interface": return BshModifier.INTERFACE; // TODO: manter ??
+            case "abstract": return BshModifier.ABSTRACT;
+            case "strictfp": return BshModifier.STRICT;
+            // case "SYNTHETIC": return BshModifier.SYNTHETIC;
+            case "@interface": return BshModifier.ANNOTATION; // TODO: manter ??
+            case "enum": return BshModifier.ENUM; // TODO: manter ??
+            // case "MANDATED": return BshModifier.MANDATED;
+            default: throw new IllegalArgumentException("Invalid keyword"); // TODO: see it better!
+        }
     }
 }

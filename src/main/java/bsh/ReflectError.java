@@ -28,9 +28,26 @@
 
 package bsh;
 
+// TODO: mudar esse ReflectError para ser um UtilEvalError tlvz ??
 class ReflectError extends RuntimeException
 {
     public ReflectError() { super(); }
     public ReflectError(String s) { super(s); }
     public ReflectError(String s,Throwable t) { super(s,t); }
+
+    // TODO: utilizar esses ReflectError customizados para erros ao acessar membros ?
+    // static class NoSuchFieldError extends ReflectError {
+    //     NoSuchFieldError(Class<?> _class, String fieldName) {
+    //         super(String.format("No such field: %s.%s", _class.getName(), fieldName));
+    //     }
+    // }
+    // static class NoSuchConstructor extends ReflectError {}
+    // static class NoSuchMethodError extends ReflectError {}
+
+    // TODO: ver isso para o suporte de classes, só consigo chamar new NoSuchMethodError() a partir de uma instância de ReflectError!
+    // class NoSuchMethodError extends ReflectError {}
+    //
+    // E.g.:
+    // ReflectError re = new ReflectError();
+    // re.new NoSuchConstructor();
 }

@@ -104,22 +104,27 @@ public final class CollectionManager {
             return Stream.concat(Stream.concat(
                 Stream.of(StringUtil.classString(type)),
                 Stream.concat(
-                    Stream.of(Reflect.getDeclaredVariables(type))
+                    Stream.of(type.getDeclaredFields())
                         .map(StringUtil::variableString)
                         .map("    "::concat),
-                    Stream.of(Reflect.getDeclaredMethods(type))
+                    Stream.of(type.getDeclaredMethods())
                         .map(StringUtil::methodString)
                         .map("    "::concat))), Stream.of("}"));
         else
-            return Stream.concat(Stream.concat(
-                Stream.of(StringUtil.classString(type)),
+            return Stream.concat(
                 Stream.concat(
-                    Stream.of(type.getFields())
-                        .map(StringUtil::variableString)
-                        .map("    "::concat),
-                    Stream.of(type.getMethods())
-                        .map(StringUtil::methodString)
-                        .map("    "::concat))), Stream.of("}"));
+                    Stream.of(StringUtil.classString(type)),
+                    Stream.concat(
+                        Stream.of(type.getFields())
+                            .map(StringUtil::variableString)
+                            .map("    "::concat),
+                        Stream.of(type.getMethods())
+                            .map(StringUtil::methodString)
+                            .map("    "::concat)
+                    )
+                ),
+                Stream.of("}")
+            );
     }
 
     /** Gets iterator for enumerated elements.

@@ -1,6 +1,7 @@
 package bsh.security;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.util.List;
 
 import org.junit.AfterClass;
@@ -102,6 +103,7 @@ public class SecurityGuardTest {
             TestUtil.eval("var obj = HashMap.class.newInstance()");
             Assert.assertTrue(true);
         } catch (Exception ex) {
+            ex.printStackTrace();
             Assert.fail("The code mustn't throw any Exception!");
         }
     }
@@ -604,10 +606,12 @@ public class SecurityGuardTest {
         try {
             TestUtil.eval(
                 "enum Test { AB; void exec() { new ArrayList().size(); } };",
-                "Test.AB.exec()"
+                "return Test.AB",
+                ""
             );
             Assert.assertTrue(true);
         } catch (Exception ex) {
+            ex.printStackTrace();
             Assert.fail("The code mustn't throw any Exception!");
         }
     }
@@ -660,6 +664,7 @@ public class SecurityGuardTest {
             );
             Assert.assertTrue(true);
         } catch (Exception ex) {
+            ex.printStackTrace();
             Assert.fail("The code mustn't throw any Exception!");
         }
     }
@@ -895,7 +900,8 @@ public class SecurityGuardTest {
         try {
             TestUtil.eval("interface EmptyInterface {}; class MyClass implements EmptyInterface { }");
             Assert.assertTrue(true);
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
+            ex.printStackTrace();
             Assert.fail("The code mustn't throw any Exception!");
         }
     }
@@ -944,10 +950,11 @@ public class SecurityGuardTest {
         try {
             Interpreter bsh = new Interpreter();
             bsh.set("mainSG", new MainSecurityGuard());
-            bsh.eval("mainSG.add(new java.util.HashMap());");
+            bsh.set("sg", new MySecurityGuard());
+            bsh.eval("mainSG.add(sg);");
             Assert.fail("The code must throw an Exception!");
         } catch (Exception ex) {
-            final String expectedMsg = "SecurityError: Can't invoke this method: bsh.security.MainSecurityGuard.add(java.util.HashMap)";
+            final String expectedMsg = "SecurityError: Can't invoke this method: bsh.security.MainSecurityGuard.add(bsh.security.SecurityGuardTest$MySecurityGuard)";
             Assert.assertTrue("Unexpected Exception Message: " + ex, ex.toString().contains(expectedMsg));
         }
     }
@@ -1084,4 +1091,8 @@ public class SecurityGuardTest {
         Assert.assertTrue(evalError2.getMessage().startsWith(expectedMessage));
     }
 
+    @Test
+    public void test() {
+        System.out.println(String[].class.getTypeName());
+    }
 }

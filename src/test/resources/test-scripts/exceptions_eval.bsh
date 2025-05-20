@@ -98,8 +98,10 @@ try {
 try {
     new ArrayList("a");
 } catch (Exception ex) {
-    Matcher m = Pattern.compile("Constructor error: Can't find constructor").matcher(ex.getMessage());
-    String err = "Expected [Constructor error: Can't find constructor] got ["+ex.getMessage()+"]";
+    //Matcher m = Pattern.compile("Constructor error: Can't find constructor").matcher(ex.getMessage());
+    //String err = "Expected [Constructor error: Can't find constructor] got ["+ex.getMessage()+"]";
+    Matcher m = Pattern.compile("Constructor error: No such constructor").matcher(ex.getMessage());
+    String err = "Expected [Constructor error: No such constructor] got ["+ex.getMessage()+"]";
     assertTrue(err,m.find());
 } finally {
     flag();

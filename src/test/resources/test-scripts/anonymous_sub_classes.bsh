@@ -82,7 +82,8 @@ class SubDefaultConstructor extends NoDefaultConstructor {
     go() { super.go() + " sub"; }
 }
 assert(isEvalError("NoDefaultConstructor", 'new SubDefaultConstructor();'));
-assert(isEvalError("Can't find constructor: SubDefaultConstructor(String) in class: SubDefaultConstructor", 'new SubDefaultConstructor("foo");'));
+//assert(isEvalError("Can't find constructor: SubDefaultConstructor(String) in class: SubDefaultConstructor", 'new SubDefaultConstructor("foo");'));
+assert(isEvalError("No such constructor: SubDefaultConstructor(java.lang.String)", 'new SubDefaultConstructor("foo");'));
 
 class SubOverrideSuper extends NoDefaultConstructor {
     spr = this.getClass().getSuperclass();

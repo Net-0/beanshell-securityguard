@@ -35,15 +35,11 @@ import bsh.classpath.BshClassPath.ClassSource;
     Because the classes are loaded via a single classloader they change as a
     group and any versioning cross dependencies can be managed.
 */
-public class DiscreteFilesClassLoader extends BshClassLoader
-{
-    /**
-        Map of class sources which also implies our coverage space.
-    */
+public class DiscreteFilesClassLoader extends BshClassLoader {
+    /** Map of class sources which also implies our coverage space. */
     ClassSourceMap map;
 
-    public static class ClassSourceMap extends HashMap<String, ClassSource>
-    {
+    public static class ClassSourceMap extends HashMap<String, ClassSource> {
         private static final long serialVersionUID = 1L;
         @Override
         public ClassSource put( String name, ClassSource source ) {
@@ -59,33 +55,24 @@ public class DiscreteFilesClassLoader extends BshClassLoader
     public static DiscreteFilesClassLoader instance() {
         return instance;
     }
-    public static void newInstance(
-            BshClassManager classManager, ClassSourceMap map ) {
+    public static void newInstance(BshClassManager classManager, ClassSourceMap map) {
         instance = new DiscreteFilesClassLoader(classManager, map);
     }
 
-    public DiscreteFilesClassLoader(
-        BshClassManager classManager, ClassSourceMap map )
-    {
+    public DiscreteFilesClassLoader(BshClassManager classManager, ClassSourceMap map) {
         super( classManager );
         this.map = map;
     }
 
-    /**
-    */
-    public Class findClass( String name ) throws ClassNotFoundException
-    {
+    public Class<?> findClass( String name ) throws ClassNotFoundException {
         // Load it if it's one of our classes
         ClassSource source = map.get( name );
 
-        if ( source != null )
-        {
+        if (source != null) {
             byte [] code = source.getCode( name );
-            return defineClass( name, code, 0,
-                    null == code ? 0 : code.length );
+            return defineClass( name, code, 0, null == code ? 0 : code.length );
         } else
-            // Let superclass BshClassLoader (URLClassLoader) findClass try
-            // to find the class...
+            // Let superclass BshClassLoader (URLClassLoader) findClass try to find the class...
             return super.findClass( name );
     }
 

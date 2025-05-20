@@ -65,7 +65,7 @@ public class Capabilities implements Supplier<Boolean>, Consumer<Boolean>
         a say in it.
         @see bsh.Reflect
     */
-    public static boolean haveAccessibility()
+    public static boolean haveAccessibility() // TODO: isso ainda faz sentido ?????
     {
         return ACCESSIBILITY.get();
     }

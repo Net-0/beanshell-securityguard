@@ -29,6 +29,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Collection;
@@ -41,6 +42,8 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import bsh.internals.BshModifier;
 
 public class StringUtil {
 
@@ -55,6 +58,7 @@ public class StringUtil {
                 : typeString(Types.getType(value));
     }
 
+    // TODO: ver isso!
     /** Type from class to string.
      * @param clas for type
      * @return string type */
@@ -187,7 +191,8 @@ public class StringUtil {
      * @param types the parameter type args
      * @return string representation of a method */
     public static String methodString(String name, Class<?>[] types) {
-        return methodString(name, getTypeNames(types));
+        // return methodString(name, getTypeNames(types));
+        return "";
     }
 
     /** Produce a simple string representation of a method name with args.
@@ -196,69 +201,71 @@ public class StringUtil {
      * @param names the parameter names
      * @return string representation of a method */
     public static String methodString(String name, Class<?>[] types, String[] names) {
-        return methodString(name, getTypeNames(types, names));
+        // return methodString(name, getTypeNames(types, names));
+        return "";
     }
 
-    /** Get type names as stream.
-     * @param types class[] of classes
-     * @return Stream of type names */
-    private static Stream<String> getTypeNamesStream(Class<?>[] types) {
-        return Stream.of(types).map(StringUtil::getTypeName);
-    }
+    // /** Get type names as stream.
+    //  * @param types class[] of classes
+    //  * @return Stream of type names */
+    // private static Stream<String> getTypeNamesStream(Class<?>[] types) {
+    //     return Stream.of(types).map(StringUtil::getTypeName);
+    // }
 
-    /** Get type names as string list.
-     * @param types class[] of classes
-     * @return List of type names */
-    private static List<String> getTypeNamesList(Class<?>[] types) {
-        return getTypeNamesStream(types).collect(Collectors.toList());
-    }
+    // /** Get type names as string list.
+    //  * @param types class[] of classes
+    //  * @return List of type names */
+    // private static List<String> getTypeNamesList(Class<?>[] types) {
+    //     return getTypeNamesStream(types).collect(Collectors.toList());
+    // }
 
-    /** Get type names as string[].
-     * @param types class[] of classes
-     * @return String[] of type names */
-    private static String[] getTypeNames(Class<?>[] types) {
-        return getTypeNamesStream(types).toArray(String[]::new);
-    }
+    // /** Get type names as string[].
+    //  * @param types class[] of classes
+    //  * @return String[] of type names */
+    // private static String[] getTypeNames(Class<?>[] types) {
+    //     return getTypeNamesStream(types).toArray(String[]::new);
+    // }
 
-    /** Get type names as string[].
-     * @param types class[] of parameter classes
-     * @param names string[] of parameter names
-     * @return String[] of type names */
-    private static String[] getTypeNames(Class<?>[] types, String[] names) {
-        Iterator<String> namesIt = Stream.of(names).iterator();
-        return getTypeNamesStream(types)
-                .map(type -> type +" "+ namesIt.next())
-                .toArray(String[]::new);
-    }
+    // /** Get type names as string[].
+    //  * @param types class[] of parameter classes
+    //  * @param names string[] of parameter names
+    //  * @return String[] of type names */
+    // private static String[] getTypeNames(Class<?>[] types, String[] names) {
+    //     Iterator<String> namesIt = Stream.of(names).iterator();
+    //     return getTypeNamesStream(types)
+    //             .map(type -> type +" "+ namesIt.next())
+    //             .toArray(String[]::new);
+    // }
 
-    /** Get type name as string.
-     * @param type class
-     * @return simple name or Object if null */
-    private static String getTypeName(Class<?> type) {
-        return ( null == type ) ? "Object"
-                : type.getSimpleName();
-    }
+    // /** Get type name as string.
+    //  * @param type class
+    //  * @return simple name or Object if null */
+    // private static String getTypeName(Class<?> type) {
+    //     return ( null == type ) ? "Object"
+    //             : type.getSimpleName();
+    // }
 
     /** Get extends string for class.
      * @param type the class to interrogate.
      * @return if type isInterface return empty string
      *         else return extends superClass */
     private static String getTypeExtends(Class<?> type) {
-        return type.isInterface() ? "" : " extends " + getTypeName(type.getSuperclass());
+        return type.isInterface() ? "" : " extends " + type.getGenericSuperclass().getTypeName();
     }
 
-    /** Get the implements/extends string for type.
-     * @param type the class to interrogate.
-     * @return string implements (for classes)/extends (for interfaces)
-     *         and comma separated list of interfaces. */
-    private static String getTypeImplements(Class<?> type) {
-        StringBuilder sb = new StringBuilder();
-        if ( type.getInterfaces().length > 0 )
-            sb.append(type.isInterface() ? " extends " : " implements ")
-             .append(String.join(", ", getTypeNamesList(type.getInterfaces())));
-        return sb.toString();
-    }
+    // /** Get the implements/extends string for type.
+    //  * @param type the class to interrogate.
+    //  * @return string implements (for classes)/extends (for interfaces)
+    //  *         and comma separated list of interfaces. */
+    // private static String getTypeImplements(Class<?> type) {
+    //     StringBuilder sb = new StringBuilder();
+    //     if ( type.getInterfaces().length > 0 )
+    //         sb.append(type.isInterface() ? " extends " : " implements ")
+    //          .append(String.join(", ", getTypeNamesList(type.getInterfaces())));
+    //     return sb.toString();
+    // }
 
+    // TODO: ver isso melhor dps!
     /** Produce a complete string representation of a reflect method. Shows
      * modifiers, return type, name and parameter types.
      * @param method a java reflect method
@@ -267,38 +274,38 @@ public class StringUtil {
         String mods = Modifier.toString(method.getModifiers());
         StringBuilder sb = new StringBuilder();
         return sb.append(mods).append(" ")
-            .append(getTypeName(method.getReturnType())).append(" ")
-            .append(methodString(method.getName(), method.getParameterTypes()))
+            .append(method.getGenericReturnType().getTypeName()).append(" ")
+            .append(methodString(method.getName(), method.getGenericParameterTypes()))
             .append(mods.contains("abstract") ? ";" : " {}").toString();
     }
 
-    /** Produce a complete string representation of a bsh method. Shows
-     * modifiers, return type, name and parameter types.
-     * @param method a bsh method
-     * @return string representation of a method */
-    public static String methodString(BshMethod method) {
-        String mods = method.getModifiers().toString().substring(11);
-        StringBuilder sb = new StringBuilder();
-        return sb.append(mods).append(" ")
-            .append(getTypeName(method.getReturnType())).append(" ")
-            .append(methodString(method.getName(),
-                    method.getParameterTypes(), method.getParameterNames()))
-            .append(mods.contains("abstract") ? ";" : " {}").toString();
-    }
+    // /** Produce a complete string representation of a bsh method. Shows
+    //  * modifiers, return type, name and parameter types.
+    //  * @param method a bsh method
+    //  * @return string representation of a method */
+    // public static String methodString(BshLocalMethod method) {
+    //     String mods = method.getModifiers().toString().substring(11);
+    //     StringBuilder sb = new StringBuilder();
+    //     return sb.append(mods).append(" ")
+    //         .append(getTypeName(method.getReturnType())).append(" ")
+    //         .append(methodString(method.getName(),
+    //                 method.getParameterTypes(), method.getParameterNames()))
+    //         .append(mods.contains("abstract") ? ";" : " {}").toString();
+    // }
 
-    /** Produce a string representation of a bsh generated class declaration.
-     * Shows modifiers, name, extends and implements.
-     * @param type the class to reflect
-     * @return string representation of a class declaration */
-    private static String generatedClassString(Class<?> type) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(Reflect.getClassModifiers(type).toString().substring(11))
-          .append(type.isInterface() ? " interface" : " class")
-          .append(" ").append(getTypeName(type))
-          .append(getTypeExtends(type))
-          .append(getTypeImplements(type));
-        return sb.append(" {").toString().trim();
-    }
+    // /** Produce a string representation of a bsh generated class declaration.
+    //  * Shows modifiers, name, extends and implements.
+    //  * @param type the class to reflect
+    //  * @return string representation of a class declaration */
+    // private static String generatedClassString(Class<?> type) {
+    //     StringBuilder sb = new StringBuilder();
+    //     sb.append(Reflect.getClassModifiers(type).toString().substring(11))
+    //       .append(type.isInterface() ? " interface" : " class")
+    //       .append(" ").append(getTypeName(type))
+    //       .append(getTypeExtends(type))
+    //       .append(getTypeImplements(type));
+    //     return sb.append(" {").toString().trim();
+    // }
 
     /** Produce a string representation of a class declaration.
      * Verifies if type is a generated class else builds a java
@@ -307,17 +314,18 @@ public class StringUtil {
      * @param type the class to reflect
      * @return string representation of a class declaration */
     public static String classString(Class<?> type) {
-        if (Reflect.isGeneratedClass(type))
-            return generatedClassString(type);
-        StringBuilder sb = new StringBuilder();
-        sb.append(Modifier.toString(type.getModifiers()))
-            .append(type.isInterface() ? "": " class")
-            .append(" ").append(getTypeName(type))
-            .append(getTypeExtends(type))
-            .append(getTypeImplements(type));
+        // if (Reflect.isGeneratedClass(type))
+        //     return generatedClassString(type);
+        final StringBuilder sb = new StringBuilder();
+        // sb.append(BshModifier.toString(type.getModifiers()))
+        //     .append(type.isInterface() ? "": " class")
+        //     .append(" ").append(type.getTypeName())
+        //     .append(getTypeExtends(type))
+        //     .append(getTypeImplements(type));
         return sb.append(" {").toString().trim();
     }
 
+    // TODO: remover isso ?
     /** Produce a string representation of a bsh variable declaration.
      * Shows modifiers, type and name.
      * @param var the variable to reflect
@@ -325,8 +333,8 @@ public class StringUtil {
     public static String variableString(Variable var) {
         StringBuilder sb = new StringBuilder();
         sb.append(var.getModifiers().toString().substring(11))
-            .append(" ").append(getTypeName(var.getType()))
-            .append(" ").append(var.getName());
+            .append(" ").append(var.type == null ? "Object" : var.type.getTypeName())
+            .append(" ").append(var.name);
         return sb.append(";").toString();
     }
 
@@ -337,7 +345,7 @@ public class StringUtil {
     public static String variableString(Field field) {
         StringBuilder sb = new StringBuilder();
         sb.append(Modifier.toString(field.getModifiers()))
-            .append(" ").append(getTypeName(field.getType()))
+            .append(" ").append(field.getType().getTypeName())
             .append(" ").append(field.getName());
         return sb.append(";").toString();
     }

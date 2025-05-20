@@ -590,3 +590,16 @@ public class FinalModifierTest {
         );
     }
 }
+
+
+
+// class A {
+//     int B = 200;
+
+
+//     void myMethod() {
+//         String B = "Hello World";
+
+//         B = 200;
+//     }
+// }

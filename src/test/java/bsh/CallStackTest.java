@@ -33,7 +33,7 @@ public class CallStackTest {
     @Test
     public void callStack_should_be_serializable() throws Exception {
         final NameSpace nameSpace = new NameSpace(null, new BshClassManager(), "test");
-        nameSpace.setLocalVariable("test", "test", false);
+        nameSpace.setLocalVariable("test", null, "test", null);
         final CallStack stack = TestUtil.serDeser(new CallStack(nameSpace));
         Assert.assertEquals("test", stack.top().get("test", null));
         stack.clear();

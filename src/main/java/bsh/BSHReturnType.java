@@ -28,34 +28,37 @@
 
 package bsh;
 
-class BSHReturnType extends SimpleNode
-{
+import java.lang.reflect.Type;
+
+class BSHReturnType extends SimpleNode {
     public boolean isVoid;
 
     BSHReturnType(int id) { super(id); }
 
-    BSHType getTypeNode() {
-        return (BSHType)jjtGetChild(0);
+    // BSHType getTypeNode() {
+    //     return (BSHType)jjtGetChild(0);
+    // }
+
+    // public String getTypeDescriptor(
+    //     CallStack callstack, Interpreter interpreter, String defaultPackage )
+    // {
+    //     if ( isVoid )
+    //         return "V";
+    //     else
+    //         return getTypeNode().getTypeDescriptor(
+    //             callstack, interpreter, defaultPackage );
+    // }
+
+    protected final Type _toType(CallStack callStack, Interpreter interpreter) throws EvalError {
+        return this.isVoid
+            ? Void.TYPE
+            : this.<BSHType>jjtGetChild(0)._toType(callStack, interpreter);
     }
 
-    public String getTypeDescriptor(
-        CallStack callstack, Interpreter interpreter, String defaultPackage )
-    {
-        if ( isVoid )
-            return "V";
-        else
-            return getTypeNode().getTypeDescriptor(
-                callstack, interpreter, defaultPackage );
-    }
-
-    public Class<?> evalReturnType(
-        CallStack callstack, Interpreter interpreter ) throws EvalError
-    {
-        if ( isVoid )
-            return Void.TYPE;
-        else
-            return getTypeNode().getType( callstack, interpreter );
-    }
+    // protected final Class<?> getType(CallStack callstack, Interpreter interpreter) throws EvalError {
+    //     if (this.isVoid) return Void.TYPE;
+    //     return ((BSHType) this.jjtGetChild(0)).getType( callstack, interpreter );
+    // }
 
     @Override
     public String toString() {

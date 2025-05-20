@@ -39,6 +39,7 @@ import java.io.Serializable;
 import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
+import java.util.NoSuchElementException;
 import java.util.ResourceBundle;
 
 import bsh.security.MainSecurityGuard;
@@ -121,13 +122,14 @@ public class Interpreter
         staticInit();
     }
 
-    /** Shared system object visible under bsh.system */
-    private static final This SYSTEM_OBJECT = This.getThis(new NameSpace(null, null, "bsh.system"), null);
+    // TODO: verificar isso!
+    // /** Shared system object visible under bsh.system */
+    private static final This SYSTEM_OBJECT = new This(new NameSpace("bsh.system"));
 
     /** Shared system object visible under bsh.system */
     public static void setShutdownOnExit(final boolean value) {
         try {
-            SYSTEM_OBJECT.getNameSpace().setVariable("shutdownOnExit", Boolean.valueOf(value), false);
+            SYSTEM_OBJECT.namespace.setLocalVariable("shutdownOnExit", Boolean.class, value, null);
         } catch (final UtilEvalError utilEvalError) {
             throw new IllegalStateException(utilEvalError);
         }
@@ -355,15 +357,14 @@ public class Interpreter
     private void initRootSystemObject() {
         BshClassManager bcm = getClassManager();
         // bsh
-        setu("bsh", new NameSpace(null, bcm, "Bsh Object" ).getThis( this ) );
+        setu("bsh", new This(new NameSpace("Bsh Object", bcm)));
 
         // bsh.system
         setu( "bsh.system", SYSTEM_OBJECT);
         setu( "bsh.shared", SYSTEM_OBJECT); // alias
 
         // bsh.help
-        This helpText = new NameSpace(null, bcm, "Bsh Command Help Text" ).getThis( this );
-        setu( "bsh.help", helpText );
+        setu( "bsh.help", new This(new NameSpace("Bsh Command Help Text", bcm)));
 
         // bsh.cwd
         setu( "bsh.cwd", System.getProperty("user.dir") );
@@ -382,17 +383,22 @@ public class Interpreter
      * for completeness.<p>
      * The global namespace can be accessed in scripts using the variable
      * 'this.namespace' or global.namespace as necessary.
-     * @param namespace global name space. */
-    public void setNameSpace( NameSpace namespace ) {
-        this.globalNameSpace = namespace;
-        if ( null != namespace ) try {
-            if ( ! (namespace.getVariable("bsh") instanceof This) ) {
+     * @param nameSpace global name space. */
+    public void setNameSpace(NameSpace nameSpace) {
+        this.globalNameSpace = nameSpace;
+        if (null != nameSpace) {
+            Object bsh = null;
+            try {
+                bsh = Reflect.getNameSpaceVariable(nameSpace, "bsh", new CallStack(), this.strictJava);
+            } catch (EvalError | UtilEvalError e) {
+                throw new IllegalStateException(e);
+            } catch (NoSuchElementException e) {}
+
+            if (!(bsh instanceof This)) {
                 initRootSystemObject();
-                if ( interactive )
+                if (interactive)
                     loadRCFiles();
             }
-        } catch (final UtilEvalError e) {
-            throw new IllegalStateException(e);
         }
     }
 
@@ -459,12 +465,8 @@ public class Interpreter
      * @param clas with static main method.
      * @param args the string arguments.
      * @throws Exception thrown if something fails. */
-    public static void invokeMain(Class<?> clas, String[] args)
-            throws Exception {
-        Invocable main = Reflect.resolveJavaMethod(clas, "main",
-                new Class[] {String[].class}, true/*onlyStatic*/);
-        if ( null != main )
-            main.invoke(null, new Object[] {args});
+    public static void invokeMain(Class<?> clas, String[] args) throws Exception {
+        Reflect.invokeStaticMethod(clas, "method", new Object[] { args }, new CallStack(), true);
     }
 
     /** Run interactively. (printing prompts, etc.) */
@@ -781,8 +783,9 @@ public class Interpreter
     public void reset() {
         this.getClassManager().reset();
         this.globalNameSpace.clear();
-        Name.clearParts();
-        Reflect.instanceCache.clear();
+        // TODO: verificar isso!
+        // Name.clearParts();
+        // Reflect.instanceCache.clear();
     }
 
     /**
@@ -896,15 +899,13 @@ public class Interpreter
         Assign the value to the name.
         name may evaluate to anything assignable. e.g. a variable or field.
     */
-    public void set(String name, Object value)
-            throws EvalError {
-        CallStack callstack = new CallStack(globalNameSpace);
+    public void set(String name, Object value) throws EvalError {
+        final CallStack callstack = new CallStack(this.globalNameSpace);
         try {
-            if ( Name.isCompound(name) )
-                globalNameSpace.getNameResolver(name).toLHS(
-                    callstack, this).assign(value, false);
+            if (name.contains("."))
+                this.globalNameSpace.getNameResolver(name).toLHS(callstack, this).assign(value);
             else // optimization for common case
-                globalNameSpace.setVariable(name, value, false);
+                Reflect.setNameSpaceVariable(this.globalNameSpace, name, value, callstack, this.strictJava);
         } catch (UtilEvalError e) {
             throw e.toEvalError(Node.JAVACODE, callstack);
         }
@@ -941,21 +942,17 @@ public class Interpreter
         Unassign the variable name.
         Name should evaluate to a variable.
     */
-    public void unset( String name )
-        throws EvalError
-    {
+    public void unset(String name) throws EvalError {
         /*
             We jump through some hoops here to handle arbitrary cases like
             unset("bsh.foo");
         */
         CallStack callstack = new CallStack();
         try {
-            LHS lhs = globalNameSpace.getNameResolver( name ).toLHS(
-                callstack, this );
+            LHS lhs = globalNameSpace.getNameResolver(name).toLHS(callstack, this);
 
-            if ( lhs.type != LHS.VARIABLE )
-                throw new EvalError("Can't unset, not a variable: "+name,
-                    Node.JAVACODE, new CallStack());
+            if (lhs.type != LHS.VARIABLE)
+                throw new EvalError("Can't unset, not a variable: "+name, Node.JAVACODE, new CallStack());
 
             lhs.nameSpace.unsetVariable( lhs.getName() );
         } catch ( UtilEvalError e ) {
@@ -1018,7 +1015,9 @@ public class Interpreter
     */
     public Object getInterface( Class<?> interf ) throws EvalError
     {
-        return globalNameSpace.getThis( this ).getInterface( interf );
+        // return globalNameSpace.getThis( this ).getInterface( interf );
+        // TODO: verificar isso!
+        throw new RuntimeException("Not implemented yet!");
     }
 
     /*  Methods for interacting with Parser */
@@ -1405,7 +1404,8 @@ public class Interpreter
     /** {@inheritDoc} */
     @Override
     public void classLoaderChanged() {
-        Reflect.instanceCache.clear();
+        // Reflect.instanceCache.clear();
+        // TODO: verificar isso!
     }
 
 }

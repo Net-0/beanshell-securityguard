@@ -24,6 +24,9 @@
  *                                                                           *
  *****************************************************************************/
 package bsh;
+
+// TODO: '.class' n deveria ser permitido em strictJava=true para referências à classes + generics e.g., List<String>.class
+// TODO: excluir essa classe e criar uma TypeIdentifier, para podermos trabalhar com generics tb!
 public class ClassIdentifier {
     Class<?> clas;
 

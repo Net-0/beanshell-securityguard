@@ -74,7 +74,7 @@ public interface Node extends ListIterator<Node> {
 
     /** Return the list of child nodes..
      * @return children array or zero length Node array */
-    Node[] jjtGetChildren();
+    <N extends Node> N[] jjtGetChildren();
     //  ---- end BeanShell specific stuff ----  //
 
     /** Called after the node has been made the current node.
@@ -101,7 +101,7 @@ public interface Node extends ListIterator<Node> {
      * The children are numbered from zero, left to right.
      * @param i child index
      * @return the node at index */
-    Node jjtGetChild(int i);
+    <N extends Node> N jjtGetChild(int i);
 
     /** Return the number of children the node has. */
     int jjtGetNumChildren();

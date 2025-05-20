@@ -29,34 +29,39 @@
 package bsh;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Type;
 
-class BSHType extends SimpleNode implements BshClassManager.Listener {
+import bsh.internals.Types;
+
+// TODO: implementar suporte à generics, wildcards, etc...
+class BSHType extends SimpleNode
+// implements BshClassManager.Listener
+{
     private static final long serialVersionUID = 1L;
-    /**
-        baseType is used during evaluation of full type and retained for the
-        case where we are an array type.
-        In the case where we are not an array this will be the same as type.
-    */
-    private Class<?> baseType;
+    // /**
+    //     baseType is used during evaluation of full type and retained for the
+    //     case where we are an array type.
+    //     In the case where we are not an array this will be the same as type.
+    // */
+    // private Class<?> baseType;
     /**
         If we are an array type this will be non zero and indicate the
         dimensionality of the array.  e.g. 2 for String[][];
     */
     private int arrayDims;
 
-    /**
-        Internal cache of the type.  Cleared on classloader change.
-    */
-    private Class<?> type;
+    // TODO: type cache should be done by NameSpace not by BSHType
+    // /**
+    //     Internal cache of the type.  Cleared on classloader change.
+    // */
+    // private Class<?> type;
 
-    /** Flag to track if instance is already a listener */
-    private boolean isListener = false;
+    // /** Flag to track if instance is already a listener */
+    // private boolean isListener = false;
 
-    String descriptor;
+    // String descriptor;
 
-    BSHType(int id) {
-        super(id);
-    }
+    BSHType(int id) { super(id); }
 
     /**
         Used by the grammar to indicate dimensions of array types
@@ -66,111 +71,190 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
         arrayDims++;
     }
 
-    Node getTypeNode() {
-        return jjtGetChild(0);
+    // Node getTypeNode() {
+    //     return jjtGetChild(0);
+    // }
+
+    // TODO: considerar aqui a questão de fields, parameters e variaveis que podem ter definição de dimensão depois do nome!
+
+    // // TODO: implementar. A ideia é que esse cara retorne a classe em questão msm, sem BshLazyType nem nada, a classe direto.
+    // public Class<?> toClass(int extraArrayDimensions, CallStack callStack, Interpreter interpreter) throws EvalError {
+    //     // // return cached type if available
+    //     // if (type != null)
+    //     //     return type;
+
+    //     // first node will either be PrimitiveType or AmbiguousName
+    //     final Node baseTypeNode = this.jjtGetChild(0);
+
+    //     if ( baseTypeNode instanceof BSHPrimitiveType )
+    //         baseType = ((BSHPrimitiveType)baseTypeNode).type;
+    //     else
+    //         try {
+    //             baseType = ((BSHName)baseTypeNode).toClass(callstack, interpreter);
+    //         } catch (EvalError e) {
+    //             // TODO: isso é um PÉSSIMO SUPORTE À GENERICS! Generics podem ter nomes maiores doq só uma única letra!
+    //             // TODO: fazer testes unitários bem melhores de generics, incluindo generics 
+    //             // Assuming generics raw type
+    //             if (baseTypeNode.getText().trim().length() == 1 && e.getCause() instanceof ClassNotFoundException)
+    //                 baseType = Object.class;
+    //             else
+    //                 throw e; // roll up unhandled error
+    //         }
+
+    //     if ( arrayDims > 0 ) {
+    //         try {
+    //             // Get the type by constructing a prototype array with
+    //             // arbitrary (zero) length in each dimension.
+    //             int[] dims = new int[arrayDims]; // int array default zeros
+    //             // TODO: base type pode ser null ??
+    //             Object obj = Array.newInstance(null == baseType ? Object.class : baseType, dims);
+    //             type = obj.getClass();
+    //         } catch(Exception e) {
+    //             throw new EvalException("Couldn't construct array type", this, callstack, e);
+    //         }
+    //     } else
+    //         type = baseType;
+
+    //     // add listener to reload type if class is reloaded see #699
+    //     if (!isListener) { // only add once
+    //         interpreter.getClassManager().addListener(this);
+    //         isListener = true;
+    //     }
+
+    //     return type;
+
+    //     return null;
+    // }
+
+    // TODO: implementar. A ideia é que esse cara retorno qualquer type, porém deve incluir estrtura de generics!
+    // public Class<?> toType(int extraArrayDimensions, CallStack callStack, Interpreter interpreter) throws EvalError {
+
+    //     return null;
+    // }
+
+    public Type _toType(CallStack callstack, Interpreter interpreter) throws EvalError {
+        // // return cached type if available
+        // if (type != null) return type;
+
+        // // first node will either be PrimitiveType or AmbiguousName
+        // Node node = this.jjtGetChild(0);
+        // if (node instanceof BSHPrimitiveType)
+        //     baseType = ((BSHPrimitiveType)node).getType();
+        // else
+        //     try {
+        //         baseType = ((BSHName)node)._toClass(callstack, interpreter);
+        //     } catch (EvalError e) {
+        //         // TODO: isso é um PÉSSIMO SUPORTE À GENERICS! Generics podem ter nomes maiores doq só uma única letra!
+        //         // TODO: fazer testes unitários bem melhores de generics, incluindo generics 
+        //         // Assuming generics raw type
+        //         if (node.getText().trim().length() == 1 && e.getCause() instanceof ClassNotFoundException)
+        //             baseType = Object.class;
+        //         else
+        //             throw e; // roll up unhandled error
+        //     }
+
+        // if (arrayDims > 0) {
+        //     try {
+        //         // Get the type by constructing a prototype array with
+        //         // arbitrary (zero) length in each dimension.
+        //         int[] dims = new int[arrayDims]; // int array default zeros
+        //         // TODO: base type pode ser null ??
+        //         Object obj = Array.newInstance(null == baseType ? Object.class : baseType, dims);
+        //         type = obj.getClass();
+        //     } catch(Exception e) {
+        //         throw new EvalException("Couldn't construct array type", this, callstack, e);
+        //     }
+        // } else
+        //     type = baseType;
+
+        // // add listener to reload type if class is reloaded see #699
+        // if (!isListener) { // only add once
+        //     interpreter.getClassManager().addListener(this);
+        //     isListener = true;
+        // }
+
+        // return type;
+
+        // TODO: e quanto haver generics ?
+
+        // first node will either be PrimitiveType or AmbiguousName
+        final Node node = this.jjtGetChild(0);
+        final Type baseType = node instanceof BSHPrimitiveType
+                                    ? ((BSHPrimitiveType) node).type
+                                    : ((BSHName) node)._toType(callstack, interpreter);
+
+
+        // TODO: e os generics ?
+
+        return this.arrayDims > 0
+                ? Array.newInstance(Types.getRawType(baseType), new int[arrayDims]).getClass()
+                : baseType;
     }
 
-    /**
-         Returns a class descriptor for this type.
-         If the type is an ambiguous name (object type) evaluation is
-         attempted through the namespace in order to resolve imports.
-         If it is not found and the name is non-compound we assume the default
-         package for the name.
-    */
-    public String getTypeDescriptor(
-        CallStack callstack, Interpreter interpreter, String defaultPackage )
-    {
-        // return cached type if available
-        if ( descriptor != null )
-            return descriptor;
+    // // TODO: terminar de ver essa 
+    // public Class<?> _toRawType(CallStack callstack, Interpreter interpreter) throws EvalError {
 
-        String descriptor;
-        //  first node will either be PrimitiveType or AmbiguousName
-        Node node = getTypeNode();
-        if ( node instanceof BSHPrimitiveType )
-            descriptor = getTypeDescriptor( ((BSHPrimitiveType)node).type );
-        else
-        {
-            String clasName = ((BSHAmbiguousName)node).text;
-            String innerClass = callstack.top().importedClasses.get(clasName);
+    //     // first node will either be PrimitiveType or AmbiguousName
+    //     final Node node = this.jjtGetChild(0);
+    //     final Type baseType = node instanceof BSHPrimitiveType
+    //                                 ? ((BSHPrimitiveType) node).type
+    //                                 : ((BSHName) node)._toType(callstack, interpreter);
+    //     final Class<?> rawBaseType = Types.getRawType(baseType);
 
-            Class<?> clas = null;
-            if ( innerClass == null ) try {
-                clas = ((BSHAmbiguousName)node).toClass(
-                    callstack, interpreter );
-            } catch ( EvalError e ) {
-                // Lets assume we have a generics raw type
-                if (clasName.length() == 1)
-                    clasName = "java.lang.Object";
-            } else
-                clasName = innerClass.replace('.', '$');
+    //     return this.arrayDims > 0
+    //             ? Array.newInstance(rawBaseType, new int[arrayDims]).getClass()
+    //             : rawBaseType;
+    // }
 
-            if ( clas != null ) {
-                descriptor = getTypeDescriptor( clas );
-            } else {
-                if ( defaultPackage == null || Name.isCompound( clasName ) )
-                    descriptor = "L" + clasName.replace('.','/') + ";";
-                else
-                    descriptor =
-                        "L"+defaultPackage.replace('.','/')+"/"+clasName + ";";
-            }
-        }
+    // // TODO: n deveria retornar um Type ao invés de Class<?>
+    // public Class<?> getType(CallStack callstack, Interpreter interpreter) throws EvalError {
+    //     // return cached type if available
+    //     if ( type != null )
+    //         return type;
 
-        for(int i=0; i<arrayDims; i++)
-            descriptor = "["+descriptor;
+    //     // first node will either be PrimitiveType or AmbiguousName
+    //     Node node = this.jjtGetChild(0);
+    //     if ( node instanceof BSHPrimitiveType )
+    //         baseType = ((BSHPrimitiveType)node).getType();
+    //     else
+    //         try {
+    //             baseType = ((BSHName)node).toClass(callstack, interpreter);
+    //         } catch (EvalError e) {
+    //             // TODO: isso é um PÉSSIMO SUPORTE À GENERICS! Generics podem ter nomes maiores doq só uma única letra!
+    //             // TODO: fazer testes unitários bem melhores de generics, incluindo generics 
+    //             // Assuming generics raw type
+    //             if (node.getText().trim().length() == 1 && e.getCause() instanceof ClassNotFoundException)
+    //                 baseType = Object.class;
+    //             else
+    //                 throw e; // roll up unhandled error
+    //         }
 
-        this.descriptor = descriptor;
-        return descriptor;
-    }
+    //     if ( arrayDims > 0 ) {
+    //         try {
+    //             // Get the type by constructing a prototype array with
+    //             // arbitrary (zero) length in each dimension.
+    //             int[] dims = new int[arrayDims]; // int array default zeros
+    //             // TODO: base type pode ser null ??
+    //             Object obj = Array.newInstance(null == baseType ? Object.class : baseType, dims);
+    //             type = obj.getClass();
+    //         } catch(Exception e) {
+    //             throw new EvalException("Couldn't construct array type", this, callstack, e);
+    //         }
+    //     } else
+    //         type = baseType;
 
-    public Class<?> getType( CallStack callstack, Interpreter interpreter )
-        throws EvalError
-    {
-        // return cached type if available
-        if ( type != null )
-            return type;
+    //     // add listener to reload type if class is reloaded see #699
+    //     if (!isListener) { // only add once
+    //         interpreter.getClassManager().addListener(this);
+    //         isListener = true;
+    //     }
 
-        //  first node will either be PrimitiveType or AmbiguousName
-        Node node = getTypeNode();
-        if ( node instanceof BSHPrimitiveType )
-            baseType = ((BSHPrimitiveType)node).getType();
-        else
-            try {
-            baseType = ((BSHAmbiguousName)node).toClass(
-                callstack, interpreter );
-            } catch (EvalError e) {
-                // Assuming generics raw type
-                if (node.getText().trim().length() == 1
-                        && e.getCause() instanceof ClassNotFoundException)
-                    baseType = Object.class;
-                else
-                    throw e; // roll up unhandled error
-            }
+    //     return type;
+    // }
 
-        if ( arrayDims > 0 ) {
-            try {
-                // Get the type by constructing a prototype array with
-                // arbitrary (zero) length in each dimension.
-                int[] dims = new int[arrayDims]; // int array default zeros
-                Object obj = Array.newInstance(
-                        null == baseType ? Object.class : baseType, dims);
-                type = obj.getClass();
-            } catch(Exception e) {
-                throw new EvalException("Couldn't construct array type",
-                    this, callstack, e);
-            }
-        } else
-            type = baseType;
+    // TODO: remover esses métodos abaixos
 
-        // add listener to reload type if class is reloaded see #699
-        if (!isListener) { // only add once
-            interpreter.getClassManager().addListener(this);
-            isListener = true;
-        }
-
-        return type;
-    }
-
+    // TODO: remover isso
     /**
         baseType is used during evaluation of full type and retained for the
         case where we are an array type.
@@ -179,37 +263,20 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
     public Class<?> getBaseType() {
         return baseType;
     }
+
+    // TODO: remover isso
     /**
         If we are an array type this will be non zero and indicate the
         dimensionality of the array.  e.g. 2 for String[][];
     */
     public int getArrayDims() {
-        return arrayDims;
+        // return arrayDims;
+        return null;
     }
 
-    /** Clear instance cache to reload types on class loader change #699 */
-    public void classLoaderChanged() {
-        type = null;
-        baseType = null;
-    }
-
-    public static String getTypeDescriptor( Class<?> clas )
-    {
-        if ( clas == Boolean.TYPE ) return "Z";
-        if ( clas == Character.TYPE ) return "C";
-        if ( clas == Byte.TYPE ) return "B";
-        if ( clas == Short.TYPE ) return "S";
-        if ( clas == Integer.TYPE ) return "I";
-        if ( clas == Long.TYPE ) return "J";
-        if ( clas == Float.TYPE ) return "F";
-        if ( clas == Double.TYPE ) return "D";
-        if ( clas == Void.TYPE ) return "V";
-
-        String name = clas.getName().replace('.','/');
-
-        if ( name.startsWith("[") || name.endsWith(";") )
-            return name;
-        else
-            return "L"+ name.replace('.','/') +";";
-    }
+    // /** Clear instance cache to reload types on class loader change #699 */
+    // public void classLoaderChanged() {
+    //     type = null;
+    //     baseType = null;
+    // }
 }

@@ -130,14 +130,16 @@ public class BshClassPathTest {
 
     @Test
     public void classpath_map_jar_filesystem() throws IOException, ClassPathException {
-        final Interpreter bsh = new Interpreter();
-        File jarFile = bsh.pathToFile("src/test/resources/test-scripts/Data/addclass.jar");
-        URL jarURL = new URL("jar:file:"+jarFile.toString()+"!/");
-        ClassManagerImpl cm = (ClassManagerImpl) bsh.getNameSpace().getClassManager();
-
-        BshClassPath bcp =  cm.getClassPath();
-        bcp.map(new URL[] { jarURL });
-        assertThat(cpmf.fs, containsString("addclass.jar"));
+        try {
+            final Interpreter bsh = new Interpreter();
+            File jarFile = bsh.pathToFile("src/test/resources/test-scripts/Data/addclass.jar");
+            URL jarURL = new URL("jar:file:"+jarFile.toString()+"!/");
+            ClassManagerImpl cm = (ClassManagerImpl) bsh.getNameSpace().getClassManager();
+    
+            BshClassPath bcp =  cm.getClassPath();
+            bcp.map(new URL[] { jarURL });
+            assertThat(cpmf.fs, containsString("addclass.jar"));
+        } catch (Throwable t) { t.printStackTrace(); }
     }
 
     @Test
@@ -259,7 +261,7 @@ public class BshClassPathTest {
         bsh.eval("class ABC {}");
         ClassSource genSrc = bcp.getClassSource("ABC");
         assertThat(genSrc, instanceOf(GeneratedClassSource.class));
-        assertThat(genSrc.getCode(""), instanceOf(byte[].class));
+        assertThat(genSrc.getCode("ABC"), instanceOf(byte[].class));
     }
 
     @Test

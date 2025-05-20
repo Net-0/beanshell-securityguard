@@ -7,6 +7,7 @@ class TestInner22
     static int s = 5;
     int i = 4;
     Object t22This = this;
+    // TODO: fazer teste unitário com strictJava para true
     new MyThread().start();
     assert( TestInner22.this == t22This );
 

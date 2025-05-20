@@ -28,6 +28,8 @@
 
 package bsh;
 
+import java.lang.reflect.Type;
+
 /**
     Implement casts.
 
@@ -42,20 +44,17 @@ class BSHCastExpression extends SimpleNode {
     /**
         @return the result of the cast.
     */
-    public Object eval(
-        CallStack callstack, Interpreter interpreter ) throws EvalError
-    {
-        Class toType = ((BSHType)jjtGetChild(0)).getType(
-            callstack, interpreter );
-        Node expression = jjtGetChild(1);
+    public Object eval(CallStack callstack, Interpreter interpreter) throws EvalError {
+        final Type toType = this.<BSHType>jjtGetChild(0)._toType(callstack, interpreter);
+        final Node expression = jjtGetChild(1);
 
         // evaluate the expression
-        Object fromValue = expression.eval(callstack, interpreter);
+        final Object fromValue = expression.eval(callstack, interpreter);
 
         // TODO: need to add isJavaCastable() test for strictJava
         // (as opposed to isJavaAssignable())
         try {
-            return Types.castObject( fromValue, toType, Types.CAST );
+            return Types.castObject(fromValue, bsh.internals.Types.getRawType(toType), Types.CAST);
         } catch ( UtilEvalError e ) {
             throw e.toEvalError( this, callstack  );
         }

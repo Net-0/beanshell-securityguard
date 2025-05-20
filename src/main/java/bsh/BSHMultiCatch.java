@@ -20,7 +20,7 @@ public class BSHMultiCatch extends SimpleNode {
     public static final Class<?> UNTYPED = null;
     public String name;
     public boolean isFinal = false;
-    public Class<?>[] types;
+    // public Class[] types;
     public BSHMultiCatch(int id) { super(id); }
 
     public int countTypes() {
@@ -39,24 +39,27 @@ public class BSHMultiCatch extends SimpleNode {
         return 0 == jjtGetNumChildren();
     }
 
+    // TODO: ver esse Node
     /**
         Evaluate the types.
      */
     public Object eval( CallStack callstack, Interpreter interpreter) throws EvalError {
-        if ( null != types )
-            return types;
+        // if ( null != types )
+        //     return types;
 
-        types = new Class[countTypes()];
-        if ( isUntyped() )
-            types[0] = UNTYPED;
-        else for ( int i=0; i< countTypes(); i++ )
-            types[i] = ((BSHType) jjtGetChild(i)).getType( callstack, interpreter );
+        // types = new Class[countTypes()];
+        // if ( isUntyped() )
+        //     types[0] = UNTYPED;
+        // else for ( int i=0; i< countTypes(); i++ )
+        //     types[i] = ((BSHType) jjtGetChild(i))._toType( callstack, interpreter );
 
-        return types;
+        // return types;
+        return new Class<?>[0];
     }
 
     public Class<?>[] getTypes() {
-        return this.types;
+        // return this.types;
+        return new Class<?>[0];
     }
 
     @Override

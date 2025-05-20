@@ -778,11 +778,18 @@ public class BshClassPath
         public String toString() { return "Jrt: "+source; }
     }
 
-    public static class GeneratedClassSource extends ClassSource
-    {
-        GeneratedClassSource( byte[] bytecode ) { source = bytecode; }
-        public byte[] getCode( String className ) {
-            return (byte[])source;
+    // TODO: rename it?
+    public static class GeneratedClassSource extends ClassSource {
+        // GeneratedClassSource( byte[] bytecode ) { source = bytecode; }
+        private final Map<String, byte[]> codes = new HashMap<>();
+
+        public byte[] getCode(String className) {
+            // return (byte[]) source;
+            return this.codes.get(className);
+        }
+
+        public void setCode(String className, byte[] code) {
+            this.codes.put(className, code);
         }
     }
 

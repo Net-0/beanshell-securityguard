@@ -32,10 +32,32 @@ class BSHSwitchLabel extends SimpleNode {
 
     public BSHSwitchLabel(int id) { super(id); }
 
-    public Object eval(
-        CallStack callstack, Interpreter interpreter) throws EvalError
-    {
-        return jjtGetChild(0).eval( callstack, interpreter );
+    public Object eval(CallStack callStack, Interpreter interpreter) throws EvalError {
+        // return jjtGetChild(0).eval(callStack, interpreter);
+        final Node valueNode = this.jjtGetChild(0);
+
+        try {
+            return valueNode.eval(callStack, interpreter);
+        } catch (EvalError e) {
+            final String valueNodeText = valueNode.getText().trim();
+            // System.out.println("BSHSwitchLabel.eval() -> strictJava: " + strictJava);
+            // System.out.println("BSHSwitchLabel.eval() -> valueNode.getText(): " + valueNode.getText());
+            // System.out.println("BSHSwitchLabel.eval() -> valueNode.getText().matches(\"\\w+\"): " + valueNode.getText().trim().matches("\\w+"));
+
+            // If it's strict java or the valueNode isn't just a simple name, then we can re-throw the error
+            if (interpreter.getStrictJava() || !valueNodeText.matches("\\w+"))
+                throw e;
+
+            // System.out.println("BSHSwitchLabel.eval() -> e.getCause() == null: " + e.getCause() == null);
+            // System.out.println("BSHSwitchLabel.eval() -> e.getCause().getMessage().startsWith(\"Can't resolve the name \"): " + e.getCause().getMessage().startsWith("Can't resolve the name "));
+            
+            // TODO: melhorar essas mensagens do EvalError tá uma merda validar isso! Talvez um stack trace customizado ? Isso seria muito maneiro!
+            // If the error message isn't that wasn't able to resolve 
+            if (e.getCause() == null || !e.getCause().getMessage().startsWith("Can't resolve the name " + valueNodeText))
+                throw e;
+
+            return Primitive.VOID;
+        }
     }
 
     @Override

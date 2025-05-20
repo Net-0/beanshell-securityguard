@@ -4,8 +4,10 @@
 .classpath
 .settings
 .project
+.vscode
 
 classes
+*.class
 dist
 javadoc
 docs/manual/bshcommands-bshdoc.xml
